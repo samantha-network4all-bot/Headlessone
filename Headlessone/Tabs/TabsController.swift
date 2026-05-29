@@ -102,6 +102,11 @@ final class TabsController: NSViewController {
         guard let id = state.activeTab else { return nil }
         return webTabs[id]
     }
+
+    func activeTabInfo() -> TabInfo? {
+        guard let id = state.activeTab else { return nil }
+        return tabInfo(for: id)
+    }
 }
 
 extension TabsController: TestAPIControllerRoutes {
@@ -110,12 +115,12 @@ extension TabsController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            var infos: [TabInfo] = []
+            var info: TabInfo?
             DispatchQueue.main.sync {
-                infos = self.allTabInfos()
-                return ()
+                info = self.activeTabInfo()
             }
-            let body = try? JSONEncoder().encode(infos)
+            guard let tab = info else { return .notFound() }
+            let body = try? JSONEncoder().encode(tab)
             return .ok(json: body ?? Data())
         }
 

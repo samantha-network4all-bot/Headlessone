@@ -83,63 +83,10 @@ extension AppController: TestAPIControllerRoutes {
             DispatchQueue.main.sync {
                 guard let win = self.windowController?.window else { return }
                 guard let contentView = win.contentView else { return }
-
-                // Cache the window content
                 let bounds = contentView.bounds
                 guard let rep = contentView.bitmapImageRepForCachingDisplay(in: bounds) else { return }
                 contentView.cacheDisplay(in: bounds, to: rep)
-
-                // Get PNG data from window chrome
-                let windowPng = rep.representation(using: .png, properties: [:])
-
-                // Snapshot the active web view
-                var webPng: Data?
-                if let webView = self.tabsController.activeWebTab?.webView {
-                    let semaphore = DispatchSemaphore(value: 0)
-                    var snapshotData: Data?
-                    let config = WKSnapshotConfiguration()
-                    config.rect = CGRect(origin: .zero, size: webView.bounds.size)
-                    webView.takeSnapshot(with: config) { image, error in
-                        if let image = image {
-                            let tiffData = image.tiffRepresentation
-                            let rep = NSBitmapImageRep(data: tiffData ?? Data())
-                            snapshotData = rep?.representation(using: .png, properties: [:])
-                        }
-                        semaphore.signal()
-                    }
-                    _ = semaphore.wait(timeout: .now() + 10)
-                    webPng = snapshotData
-                }
-
-                // If we have both composite them, otherwise use whichever we have
-                if let wData = windowPng, let webData = webPng {
-                    // Draw page content into the window's screenshot
-                    if let fullImage = NSImage(data: wData),
-                       let pageImage = NSImage(data: webData),
-                       let fullRep = NSBitmapImageRep(data: fullImage.tiffRepresentation ?? Data()) {
-                        let compositeRep = NSBitmapImageRep(
-                            bitmapDataPlanes: nil,
-                            pixelsWide: Int(bounds.width),
-                            pixelsHigh: Int(bounds.height),
-                            bitsPerSample: 8,
-                            samplesPerPixel: 4,
-                            hasAlpha: true,
-                            isPlanar: false,
-                            colorSpaceName: .deviceRGB,
-                            bytesPerRow: 0,
-                            bitsPerPixel: 0
-                        )
-                        // Fall back to window png + web png combined: just use the web page if available
-                        // For tests, we just need a valid PNG
-                        pngData = webData
-                    } else {
-                        pngData = wData
-                    }
-                } else if let wData = windowPng {
-                    pngData = wData
-                } else if let webData = webPng {
-                    pngData = webData
-                }
+                pngData = rep.representation(using: .png, properties: [:])
             }
 
             guard let data = pngData else {

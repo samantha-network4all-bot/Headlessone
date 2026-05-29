@@ -32,7 +32,7 @@ extension WindowController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
             let info = WindowInfo(id: "w1", title: "Headlessone", isKey: true)
-            let body = try? JSONEncoder().encode([info])
+            let body = try? JSONEncoder().encode(info)
             return .ok(json: body ?? Data())
         }
     }
