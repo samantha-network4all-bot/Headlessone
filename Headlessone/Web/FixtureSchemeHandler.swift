@@ -10,7 +10,7 @@ final class FixtureSchemeHandler: NSObject, WKURLSchemeHandler {
         let host = url.host ?? ""
         let filename = host.isEmpty ? "newtab" : host
         let bundle = Bundle.main
-        guard let path = bundle.path(forResource: filename, ofType: "html", inDirectory: "Fixtures") else {
+        guard let path = bundle.path(forResource: filename, ofType: "html") else {
             let response = HTTPURLResponse(url: url, statusCode: 404, httpVersion: nil, headerFields: nil)!
             urlSchemeTask.didReceive(response)
             urlSchemeTask.didReceive(Data("Not found: \(filename)".utf8))

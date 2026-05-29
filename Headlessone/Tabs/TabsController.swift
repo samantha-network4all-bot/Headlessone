@@ -116,12 +116,11 @@ extension TabsController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            var info: TabInfo?
+            var infos: [TabInfo] = []
             DispatchQueue.main.sync {
-                info = self.activeTabInfo()
+                infos = self.allTabInfos()
             }
-            guard let tab = info else { return .notFound() }
-            let body = try? JSONEncoder().encode(tab)
+            let body = try? JSONEncoder().encode(infos)
             return .ok(json: body ?? Data())
         }
 
