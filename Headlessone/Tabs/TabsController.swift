@@ -21,6 +21,7 @@ final class TabsController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         tabController = TabController(tabsController: self)
+        _ = tabController.view // triggers viewDidLoad so /tab/* routes register
         TestAPIRouter.shared.register(controller: self)
 
         // Create initial tab
