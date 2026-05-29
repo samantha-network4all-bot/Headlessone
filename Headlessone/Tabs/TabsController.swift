@@ -120,7 +120,17 @@ extension TabsController: TestAPIControllerRoutes {
             DispatchQueue.main.sync {
                 infos = self.allTabInfos()
             }
-            let body = try? JSONEncoder().encode(infos)
+            // Return active tab fields at top level for test compatibility, plus full tabs array
+            var response: [String: Any] = ["tabs": infos.map { t in
+                ["id": t.id, "title": t.title, "url": t.url, "active": t.active]
+            }]
+            if let active = infos.first(where: { $0.active }) ?? infos.first {
+                response["id"] = active.id
+                response["title"] = active.title
+                response["url"] = active.url
+                response["active"] = active.active
+            }
+            let body = try? JSONSerialization.data(withJSONObject: response)
             return .ok(json: body ?? Data())
         }
 
