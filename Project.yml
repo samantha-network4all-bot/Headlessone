@@ -15,6 +15,9 @@ targets:
       gatherCoverageData: false
     sources:
       - path: Headlessone
+    resources:
+      - path: Headlessone/Fixtures
+        type: folder
     settings:
       base:
         PRODUCT_NAME: Headlessone
