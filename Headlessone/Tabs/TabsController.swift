@@ -208,10 +208,9 @@ extension TabsController: TestAPIControllerRoutes {
                 return .badRequest("invalid URL: \(b.url)")
             }
             var result: [String: Any] = [:]
-            DispatchQueue.main.sync {
+            if Thread.isMainThread {
                 guard let webTab = self.activeWebTab else {
-                    result = ["error": "no active tab"]
-                    return
+                    return .notFound()
                 }
                 webTab.navigateSynchronously(url: url)
                 result = [
@@ -219,9 +218,22 @@ extension TabsController: TestAPIControllerRoutes {
                     "title": webTab.title,
                     "loadState": webTab.loadState
                 ]
-            }
-            if result["error"] != nil {
-                return .notFound()
+            } else {
+                DispatchQueue.main.sync {
+                    guard let webTab = self.activeWebTab else {
+                        result = ["error": "no active tab"]
+                        return
+                    }
+                    webTab.navigateSynchronously(url: url)
+                    result = [
+                        "url": webTab.url?.absoluteString ?? "",
+                        "title": webTab.title,
+                        "loadState": webTab.loadState
+                    ]
+                }
+                if result["error"] != nil {
+                    return .notFound()
+                }
             }
             let json = try! JSONSerialization.data(withJSONObject: result)
             return .ok(json: json)
@@ -260,22 +272,28 @@ extension TabsController: TestAPIControllerRoutes {
             var responseData: Data
             if let resultValue = evalResult["result"] {
                 if resultValue is NSNull {
-                    responseData = "{\"result\":null}\n".data(using: .utf8)!
+                    responseData = "{\"result\":null}".data(using: .utf8)!
                 } else if let s = resultValue as? String {
-                    let enc = try? JSONEncoder().encode(["result": s])
-                    responseData = enc ?? "{\"result\":\"\(s)\"}\n".data(using: .utf8)!
+                    let responseObj = ["result": s]
+                    responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
                 } else if let num = resultValue as? NSNumber {
-                    let enc = try? JSONEncoder().encode(["result": num.stringValue])
-                    responseData = enc ?? Data()
+                    if CFBooleanGetTypeID() == CFGetTypeID(num) {
+                        let responseObj = ["result": num.boolValue]
+                        responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
+                    } else {
+                        let responseObj: [String: Any] = ["result": num.doubleValue]
+                        responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
+                    }
                 } else if let dict = resultValue as? [String: Any] {
                     responseData = try! JSONSerialization.data(withJSONObject: ["result": dict])
                 } else if let arr = resultValue as? [Any] {
                     responseData = try! JSONSerialization.data(withJSONObject: ["result": arr])
                 } else {
-                    responseData = try! JSONEncoder().encode(["result": "\(resultValue)"])
+                    let responseObj = ["result": "\(resultValue)"]
+                    responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
                 }
             } else {
-                responseData = "{\"result\":null}\n".data(using: .utf8)!
+                responseData = "{\"result\":null}".data(using: .utf8)!
             }
             return .ok(json: responseData)
         }
