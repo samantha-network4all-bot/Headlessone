@@ -46,26 +46,13 @@ extension TabController: TestAPIControllerRoutes {
                 } else {
                     targetTab = self.activeWebTab()
                 }
-                return ()
             }
 
             guard let webTab = targetTab else {
                 return .badRequest("tab not found")
             }
 
-            DispatchQueue.main.sync {
-                webTab.loadState = "loading"
-                webTab.webView.load(URLRequest(url: targetUrl))
-            }
-
-            // Wait for load to finish (synchronous from HTTP perspective)
-            let semaphore = DispatchSemaphore(value: 0)
-            var maxWait = 150 // 15 seconds at 0.1s intervals
-            while webTab.loadState == "loading" && maxWait > 0 {
-                DispatchQueue.main.sync {}
-                Thread.sleep(forTimeInterval: 0.1)
-                maxWait -= 1
-            }
+            webTab.navigateSynchronously(url: targetUrl)
 
             let response: [String: String] = [
                 "ok": "true",
@@ -137,17 +124,8 @@ extension TabController: TestAPIControllerRoutes {
                 "canGoForward": tab.canGoForward,
                 "progress": tab.progress
             ]
-            // Manual JSON since we have Any
-            var json = "{"
-            json += "\"tabId\":\"\(tab.id)\","
-            json += "\"url\":\"\(tab.url?.absoluteString ?? "")\","
-            json += "\"title\":\"\(tab.title)\","
-            json += "\"loadState\":\"\(tab.loadState)\","
-            json += "\"canGoBack\":\(tab.canGoBack),"
-            json += "\"canGoForward\":\(tab.canGoForward),"
-            json += "\"progress\":\(tab.progress)"
-            json += "}\n"
-            return .ok(json: Data(json.utf8))
+            let json = try! JSONSerialization.data(withJSONObject: state)
+            return .ok(json: json)
         }
 
         router.post(prefix: Self.routePrefix, path: "/eval") { [weak self] req in
@@ -156,28 +134,56 @@ extension TabController: TestAPIControllerRoutes {
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"js\": String}")
             }
-            var result: String?
-            DispatchQueue.main.sync {
-                self.activeWebTab()?.webView.evaluateJavaScript(b.js) { res, err in
-                    if let err = err {
-                        result = String(describing: err)
-                    } else if let res = res {
-                        result = String(describing: res)
-                    } else {
-                        result = "null"
-                    }
+            var evalResult: [String: Any] = [:]
+            let semaphore = DispatchSemaphore(value: 0)
+            DispatchQueue.main.async {
+                guard let webTab = self.activeWebTab() else {
+                    evalResult = ["error": "no active tab"]
+                    semaphore.signal()
+                    return
                 }
-                return ()
+                webTab.webView.evaluateJavaScript(b.js) { res, err in
+                    if let err = err {
+                        evalResult = ["error": "\(err)"]
+                    } else if let value = res {
+                        evalResult = ["result": value]
+                    } else {
+                        evalResult = ["result": NSNull()]
+                    }
+                    semaphore.signal()
+                }
             }
-            // Wait briefly for JS eval
-            var maxWait = 50 // 5 seconds
-            while result == nil && maxWait > 0 {
-                Thread.sleep(forTimeInterval: 0.1)
-                maxWait -= 1
+            semaphore.wait()
+            if let errMsg = evalResult["error"] as? String {
+                return .serverError(errMsg)
             }
-            let output = result ?? "timeout"
-            let body = try? JSONEncoder().encode(["result": output])
-            return .ok(json: body ?? Data())
+            var responseData: Data
+            if let resultValue = evalResult["result"] {
+                if resultValue is NSNull {
+                    responseData = "{\"result\":null}".data(using: .utf8)!
+                } else if let s = resultValue as? String {
+                    let responseObj = ["result": s]
+                    responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
+                } else if let num = resultValue as? NSNumber {
+                    if CFBooleanGetTypeID() == CFGetTypeID(num) {
+                        let responseObj = ["result": num.boolValue]
+                        responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
+                    } else {
+                        let responseObj: [String: Any] = ["result": num.doubleValue]
+                        responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
+                    }
+                } else if let dict = resultValue as? [String: Any] {
+                    responseData = try! JSONSerialization.data(withJSONObject: ["result": dict])
+                } else if let arr = resultValue as? [Any] {
+                    responseData = try! JSONSerialization.data(withJSONObject: ["result": arr])
+                } else {
+                    let responseObj = ["result": "\(resultValue)"]
+                    responseData = (try? JSONSerialization.data(withJSONObject: responseObj)) ?? Data()
+                }
+            } else {
+                responseData = "{\"result\":null}".data(using: .utf8)!
+            }
+            return .ok(json: responseData)
         }
     }
 }
