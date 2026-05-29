@@ -6,7 +6,6 @@ final class TabsController: NSViewController {
     private var webTabs: [String: WebTab] = [:]
     private var tabController: TabController!
     private var windowController: WindowController!
-    private var testAPIServer: TestAPIServer?
 
     init(windowController: WindowController) {
         self.windowController = windowController
@@ -23,16 +22,6 @@ final class TabsController: NSViewController {
         super.viewDidLoad()
         tabController = TabController(tabsController: self)
         TestAPIRouter.shared.register(controller: self)
-
-        // Start test API server if env var is set
-        if ProcessInfo.processInfo.environment["HEADLESSONE_TEST_API"] == "1" {
-            testAPIServer = TestAPIServer()
-            do {
-                try testAPIServer?.start()
-            } catch {
-                NSLog("Failed to start TestAPIServer: \(error)")
-            }
-        }
 
         // Create initial tab
         let id = state.newTabId()
@@ -75,10 +64,6 @@ final class TabsController: NSViewController {
     }
 
     func closeTab(id: String) {
-        guard state.tabs.count > 1 || true else {
-            // Always allow close; will create new tab below
-            return
-        }
         webTabs[id]?.teardown()
         webTabs.removeValue(forKey: id)
         state.removeTab(id: id)
@@ -125,7 +110,11 @@ extension TabsController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            let infos = self.allTabInfos()
+            var infos: [TabInfo] = []
+            DispatchQueue.main.sync {
+                infos = self.allTabInfos()
+                return ()
+            }
             let body = try? JSONEncoder().encode(infos)
             return .ok(json: body ?? Data())
         }
