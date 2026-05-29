@@ -39,11 +39,14 @@ final class OmniboxController: NSViewController {
         return "https://duckduckgo.com/?q=\(escaped)"
     }
 
-    func submit(text: String) {
+    func submit(text: String) -> String {
         let url = resolveURL(from: text)
-        guard let targetURL = URL(string: url) else { return }
-        tabsController?.activeWebTab?.load(url: targetURL)
+        guard let targetURL = URL(string: url) else { return url }
+        if let webTab = tabsController?.activeWebTab {
+            webTab.navigateSynchronously(url: targetURL)
+        }
         state.text = url
+        return url
     }
 }
 
@@ -57,9 +60,9 @@ extension OmniboxController: TestAPIControllerRoutes {
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"text\": String}")
             }
-            let navigatedTo = self.resolveURL(from: b.text)
+            var navigatedTo = ""
             DispatchQueue.main.sync {
-                self.submit(text: b.text)
+                navigatedTo = self.submit(text: b.text)
             }
             struct SubmitResponse: Codable { let ok: Bool; let navigatedTo: String }
             let body = try? JSONEncoder().encode(SubmitResponse(ok: true, navigatedTo: navigatedTo))
