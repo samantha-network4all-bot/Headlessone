@@ -49,10 +49,16 @@ final class WebTab: NSObject, WKNavigationDelegate {
 
     func navigateSynchronously(url: URL, timeout: TimeInterval = 15.0) {
         navigationFinished = false
-        DispatchQueue.main.sync {
+        if Thread.isMainThread {
             self.loadState = "loading"
             self.url = url
             self.webView.load(URLRequest(url: url))
+        } else {
+            DispatchQueue.main.sync {
+                self.loadState = "loading"
+                self.url = url
+                self.webView.load(URLRequest(url: url))
+            }
         }
         let deadline = Date().addingTimeInterval(timeout)
         while !navigationFinished && Date() < deadline {

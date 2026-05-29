@@ -47,8 +47,8 @@ final class TabsController: NSViewController {
         // Place webview in content area
         windowController.rootView.contentAreaView.showWebView(webTab.webView)
 
-        // Load fixture://newtab
-        webTab.load(url: URL(string: "fixture://newtab")!)
+        // Load fixture://newtab synchronously so the back-forward list is populated before tests run
+        webTab.navigateSynchronously(url: URL(string: "fixture://newtab")!)
     }
 
     func newTab(url: String = "fixture://newtab") -> String {
