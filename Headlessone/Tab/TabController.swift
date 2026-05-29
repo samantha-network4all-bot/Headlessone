@@ -54,13 +54,16 @@ extension TabController: TestAPIControllerRoutes {
 
             webTab.navigateSynchronously(url: targetUrl)
 
-            let response: [String: String] = [
-                "ok": "true",
-                "url": webTab.url?.absoluteString ?? b.url,
-                "title": webTab.title,
-                "loadState": webTab.loadState
-            ]
-            let body = try? JSONEncoder().encode(response)
+            var response: [String: Any]?
+            DispatchQueue.main.sync {
+                response = [
+                    "ok": true,
+                    "url": webTab.url?.absoluteString ?? b.url,
+                    "title": webTab.title,
+                    "loadState": webTab.loadState
+                ]
+            }
+            let body = try? JSONSerialization.data(withJSONObject: response ?? [:])
             return .ok(json: body ?? Data())
         }
 
@@ -103,28 +106,29 @@ extension TabController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/state") { [weak self] req in
             guard let self else { return .notFound() }
             let tabId = req.query["tabId"]
-            var webTab: WebTab?
+            var state: [String: Any]?
             DispatchQueue.main.sync {
+                var webTab: WebTab?
                 if let id = tabId {
                     webTab = self.tabsController.webTab(for: id)
                 } else {
                     webTab = self.activeWebTab()
                 }
-                return ()
+                guard let tab = webTab else { return }
+                state = [
+                    "tabId": tab.id,
+                    "url": tab.url?.absoluteString ?? "",
+                    "title": tab.title,
+                    "loadState": tab.loadState,
+                    "canGoBack": tab.canGoBack,
+                    "canGoForward": tab.canGoForward,
+                    "progress": tab.progress
+                ]
             }
-            guard let tab = webTab else {
+            guard let s = state else {
                 return .badRequest("tab not found")
             }
-            let state: [String: Any] = [
-                "tabId": tab.id,
-                "url": tab.url?.absoluteString ?? "",
-                "title": tab.title,
-                "loadState": tab.loadState,
-                "canGoBack": tab.canGoBack,
-                "canGoForward": tab.canGoForward,
-                "progress": tab.progress
-            ]
-            let json = try! JSONSerialization.data(withJSONObject: state)
+            let json = try! JSONSerialization.data(withJSONObject: s)
             return .ok(json: json)
         }
 
@@ -134,15 +138,17 @@ extension TabController: TestAPIControllerRoutes {
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"js\": String}")
             }
-            var evalResult: [String: Any] = [:]
-            let semaphore = DispatchSemaphore(value: 0)
+            var evalResult: [String: Any]?
+            let sem = DispatchSemaphore(value: 0)
+            var webTab: WebTab?
+            DispatchQueue.main.sync {
+                webTab = self.activeWebTab()
+            }
+            guard let tab = webTab else {
+                return .serverError("no active tab")
+            }
             DispatchQueue.main.async {
-                guard let webTab = self.activeWebTab() else {
-                    evalResult = ["error": "no active tab"]
-                    semaphore.signal()
-                    return
-                }
-                webTab.webView.evaluateJavaScript(b.js) { res, err in
+                tab.webView.evaluateJavaScript(b.js) { res, err in
                     if let err = err {
                         evalResult = ["error": "\(err)"]
                     } else if let value = res {
@@ -150,15 +156,18 @@ extension TabController: TestAPIControllerRoutes {
                     } else {
                         evalResult = ["result": NSNull()]
                     }
-                    semaphore.signal()
+                    sem.signal()
                 }
             }
-            semaphore.wait()
-            if let errMsg = evalResult["error"] as? String {
+            _ = sem.wait(timeout: .now() + 10)
+            guard let result = evalResult else {
+                return .serverError("eval timed out")
+            }
+            if let errMsg = result["error"] as? String {
                 return .serverError(errMsg)
             }
             var responseData: Data
-            if let resultValue = evalResult["result"] {
+            if let resultValue = result["result"] {
                 if resultValue is NSNull {
                     responseData = "{\"result\":null}".data(using: .utf8)!
                 } else if let s = resultValue as? String {

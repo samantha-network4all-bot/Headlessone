@@ -51,13 +51,15 @@ final class WebTab: NSObject, WKNavigationDelegate {
 
     func navigateSynchronously(url: URL, timeout: TimeInterval = 15.0) {
         let sem = DispatchSemaphore(value: 0)
-        self.loadState = "loading"
-        self.url = url
         if Thread.isMainThread {
+            self.loadState = "loading"
+            self.url = url
             self.navigateSemaphore = sem
             self.webView.load(URLRequest(url: url))
         } else {
             DispatchQueue.main.sync {
+                self.loadState = "loading"
+                self.url = url
                 self.navigateSemaphore = sem
                 self.webView.load(URLRequest(url: url))
             }

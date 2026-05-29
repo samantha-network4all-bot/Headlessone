@@ -116,11 +116,12 @@ extension TabsController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            var infos: [TabInfo] = []
+            var info: TabInfo?
             DispatchQueue.main.sync {
-                infos = self.allTabInfos()
+                info = self.activeTabInfo()
             }
-            let body = try? JSONEncoder().encode(infos)
+            guard let tab = info else { return .notFound() }
+            let body = try? JSONEncoder().encode(tab)
             return .ok(json: body ?? Data())
         }
 
@@ -172,7 +173,5 @@ extension TabsController: TestAPIControllerRoutes {
             // Reorder not yet implemented in UI but accepted for API parity
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
-
-
     }
 }
