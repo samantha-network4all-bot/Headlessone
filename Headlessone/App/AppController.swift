@@ -33,12 +33,14 @@ final class AppController: NSViewController {
         )
         windowController.attachToWindow(win)
 
-        // Create tabs controller
+        // Create tabs controller (access .view to trigger viewDidLoad → route registration)
         tabsController = TabsController(windowController: windowController)
+        _ = tabsController.view
 
         // Create omnibox controller
         omniboxController = OmniboxController()
         omniboxController.tabsController = tabsController
+        _ = omniboxController.view
 
         // Register routes (top-level orchestrator routes)
         TestAPIRouter.shared.register(controller: self)
