@@ -171,5 +171,113 @@ extension TabsController: TestAPIControllerRoutes {
             // Reorder not yet implemented in UI but accepted for API parity
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
+
+        // /tab/navigate — synchronous navigation
+        router.get(prefix: "tab", path: "/state") { [weak self] _ in
+            guard let self else { return .notFound() }
+            var state: [String: Any] = [:]
+            DispatchQueue.main.sync {
+                guard let webTab = self.activeWebTab, let activeId = self.state.activeTab else {
+                    state = ["error": "no active tab"]
+                    return
+                }
+                state = [
+                    "tabId": activeId,
+                    "url": webTab.url?.absoluteString ?? "",
+                    "title": webTab.title,
+                    "loadState": webTab.loadState,
+                    "canGoBack": webTab.canGoBack,
+                    "canGoForward": webTab.canGoForward,
+                    "progress": webTab.progress
+                ]
+            }
+            if state["error"] != nil {
+                return .notFound()
+            }
+            let json = try! JSONSerialization.data(withJSONObject: state)
+            return .ok(json: json)
+        }
+
+        router.post(prefix: "tab", path: "/navigate") { [weak self] req in
+            guard let self else { return .notFound() }
+            struct Body: Decodable { let url: String }
+            guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
+                return .badRequest("body must be {\"url\": String}")
+            }
+            guard let url = URL(string: b.url) else {
+                return .badRequest("invalid URL: \(b.url)")
+            }
+            var result: [String: Any] = [:]
+            DispatchQueue.main.sync {
+                guard let webTab = self.activeWebTab else {
+                    result = ["error": "no active tab"]
+                    return
+                }
+                webTab.navigateSynchronously(url: url)
+                result = [
+                    "url": webTab.url?.absoluteString ?? "",
+                    "title": webTab.title,
+                    "loadState": webTab.loadState
+                ]
+            }
+            if result["error"] != nil {
+                return .notFound()
+            }
+            let json = try! JSONSerialization.data(withJSONObject: result)
+            return .ok(json: json)
+        }
+
+        router.post(prefix: "tab", path: "/eval") { [weak self] req in
+            guard let self else { return .notFound() }
+            struct Body: Decodable { let js: String }
+            guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
+                return .badRequest("body must be {\"js\": String}")
+            }
+            var evalResult: [String: Any] = [:]
+            // WKWebView.evaluateJavaScript is async; we need to wait for the result
+            let semaphore = DispatchSemaphore(value: 0)
+            DispatchQueue.main.async {
+                guard let webTab = self.activeWebTab else {
+                    evalResult = ["error": "no active tab"]
+                    semaphore.signal()
+                    return
+                }
+                webTab.webView.evaluateJavaScript(b.js) { res, err in
+                    if let err = err {
+                        evalResult = ["error": "\(err)"]
+                    } else if let value = res {
+                        evalResult = ["result": value]
+                    } else {
+                        evalResult = ["result": NSNull()]
+                    }
+                    semaphore.signal()
+                }
+            }
+            semaphore.wait()
+            if evalResult["error"] != nil {
+                return .serverError(evalResult["error"] as? String ?? "eval error")
+            }
+            var responseData: Data
+            if let resultValue = evalResult["result"] {
+                if resultValue is NSNull {
+                    responseData = "{\"result\":null}\n".data(using: .utf8)!
+                } else if let s = resultValue as? String {
+                    let enc = try? JSONEncoder().encode(["result": s])
+                    responseData = enc ?? "{\"result\":\"\(s)\"}\n".data(using: .utf8)!
+                } else if let num = resultValue as? NSNumber {
+                    let enc = try? JSONEncoder().encode(["result": num.stringValue])
+                    responseData = enc ?? Data()
+                } else if let dict = resultValue as? [String: Any] {
+                    responseData = try! JSONSerialization.data(withJSONObject: ["result": dict])
+                } else if let arr = resultValue as? [Any] {
+                    responseData = try! JSONSerialization.data(withJSONObject: ["result": arr])
+                } else {
+                    responseData = try! JSONEncoder().encode(["result": "\(resultValue)"])
+                }
+            } else {
+                responseData = "{\"result\":null}\n".data(using: .utf8)!
+            }
+            return .ok(json: responseData)
+        }
     }
 }

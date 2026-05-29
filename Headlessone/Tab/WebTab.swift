@@ -12,6 +12,7 @@ final class WebTab: NSObject, WKNavigationDelegate {
     private(set) var progress: Double = 0.0
 
     private var navigationContinuation: CheckedContinuation<Void, Never>?
+    private var navigationSettled = false
 
     init(id: String, configuration: WKWebViewConfiguration) {
         self.id = id
@@ -46,13 +47,19 @@ final class WebTab: NSObject, WKNavigationDelegate {
         return true
     }
 
+    private var navigateSemaphore: DispatchSemaphore?
+
     func navigateSynchronously(url: URL, timeout: TimeInterval = 15.0) {
+        let sem = DispatchSemaphore(value: 0)
         DispatchQueue.main.sync {
             self.loadState = "loading"
+            self.navigationSettled = false
+            self.navigateSemaphore = sem
             self.url = url
             self.webView.load(URLRequest(url: url))
         }
-        _ = navigationContinuation
+        _ = sem.wait(timeout: .now() + timeout)
+        self.navigateSemaphore = nil
     }
 
     @objc override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
@@ -83,14 +90,17 @@ final class WebTab: NSObject, WKNavigationDelegate {
         if let t = webView.title, !t.isEmpty { title = t }
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
+        navigateSemaphore?.signal()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         loadState = "failed"
+        navigateSemaphore?.signal()
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         loadState = "failed"
+        navigateSemaphore?.signal()
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
