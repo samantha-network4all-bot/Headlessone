@@ -1,5 +1,6 @@
 import Foundation
 
+// MARK: - BookmarkEntry
 struct BookmarkEntry: Codable, Equatable {
     let id: String
     let url: String
