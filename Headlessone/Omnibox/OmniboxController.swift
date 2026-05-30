@@ -68,6 +68,32 @@ final class OmniboxController: NSViewController {
         omniboxView.stringValue = url
         return (url, true)
     }
+
+    private func isLocalScheme(_ url: String) -> Bool {
+        let lower = url.lowercased()
+        return lower.hasPrefix("fixture://") || lower.hasPrefix("file://") || lower.hasPrefix("data:")
+    }
+
+    private func resolveAndNavigate(text: String) -> String {
+        let url = resolveURL(from: text)
+        guard let targetURL = URL(string: url) else {
+            DispatchQueue.main.sync {
+                self.state.text = url
+                self.omniboxView.stringValue = url
+            }
+            return url
+        }
+        DispatchQueue.main.sync {
+            self.state.text = url
+            self.omniboxView.stringValue = url
+            if self.isLocalScheme(url) {
+                self.tabsController?.activeWebTab?.navigateSynchronously(url: targetURL)
+            } else {
+                self.tabsController?.activeWebTab?.load(url: targetURL)
+            }
+        }
+        return url
+    }
 }
 
 extension OmniboxController: TestAPIControllerRoutes {
@@ -80,18 +106,19 @@ extension OmniboxController: TestAPIControllerRoutes {
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"text\": String}")
             }
-            var result: (navigatedTo: String, ok: Bool) = ("", false)
-            DispatchQueue.main.sync {
-                result = self.submit(text: b.text)
-            }
+            let resolvedUrl = self.resolveAndNavigate(text: b.text)
             struct SubmitResponse: Codable { let ok: Bool; let navigatedTo: String }
-            let bodyData = try? JSONEncoder().encode(SubmitResponse(ok: result.ok, navigatedTo: result.navigatedTo))
+            let bodyData = try? JSONEncoder().encode(SubmitResponse(ok: true, navigatedTo: resolvedUrl))
             return .ok(json: bodyData ?? Data())
         }
 
         router.get(prefix: Self.routePrefix, path: "/state") { [weak self] _ in
             guard let self else { return .notFound() }
-            let body = try? JSONEncoder().encode(["text": self.state.text])
+            var text = ""
+            DispatchQueue.main.sync {
+                text = self.state.text
+            }
+            let body = try? JSONEncoder().encode(["text": text])
             return .ok(json: body ?? Data())
         }
     }
