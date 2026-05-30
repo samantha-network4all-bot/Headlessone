@@ -8,7 +8,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
     private var activeDownloads: [String: WKDownload] = [:]
     private var downloadSemaphores: [String: DispatchSemaphore] = [:]
     private var lastBytesWritten: [String: Int64] = [:]
-    private var downloadFilenames: [String: String] = [:]
     private let lock = NSLock()
 
     init() {
@@ -28,12 +27,14 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
 
     private func filenameFromURL(_ url: URL) -> String {
         let last = url.lastPathComponent
-        if !last.isEmpty { return last }
+        if !isEmpty(last) { return last }
         if let host = url.host, !host.isEmpty { return host }
         return "download"
     }
 
-    func start(url: URL, forcedId: String? = nil) -> (id: String, settled: Bool) {
+    private func isEmpty(_ s: String) -> Bool { s.isEmpty }
+
+    func start(url: URL) -> String {
         let filename = filenameFromURL(url)
 
         // For fixture:// URLs, serve data directly from bundle for deterministic downloads
@@ -45,32 +46,27 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
             var finalState = "failed"
             var finalBytes = 0
             if let data = data, !data.isEmpty {
-                try? data.write(to: dest)
-                finalState = "finished"
-                finalBytes = data.count
+                do {
+                    try data.write(to: dest)
+                    finalState = "finished"
+                    finalBytes = data.count
+                } catch {
+                    finalState = "failed"
+                    finalBytes = 0
+                }
             }
-            let id = DispatchQueue.main.sync { [weak self] () -> String in
-                guard let self else { return forcedId ?? ".d0" }
-                return self.store.add(id: forcedId, url: url.absoluteString, filename: filename)
-            }
-            DispatchQueue.main.sync {
-                self.store.update(id: id, state: finalState, bytesReceived: finalBytes)
-            }
-            return (id: id, settled: true)
+            let id = self.store.add(url: url.absoluteString, filename: filename)
+            self.store.update(id: id, state: finalState, bytesReceived: finalBytes)
+            return id
         }
 
-        // For non-fixture urls, create the store entry first to get a stable id,
-        // then start the WKDownload asynchronously
-        var storeId = ""
-        DispatchQueue.main.sync {
-            storeId = self.store.add(id: forcedId, url: url.absoluteString, filename: filename)
-        }
+        // For non-fixture urls, start the WKDownload asynchronously with semaphore for synchronous response
+        let id = self.store.add(url: url.absoluteString, filename: filename)
 
         let sem = DispatchSemaphore(value: 0)
         lock.lock()
-        downloadSemaphores[storeId] = sem
-        lastBytesWritten[storeId] = 0
-        downloadFilenames[storeId] = filename
+        downloadSemaphores[id] = sem
+        lastBytesWritten[id] = 0
         lock.unlock()
 
         DispatchQueue.main.async { [weak self] in
@@ -79,10 +75,9 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
                 return
             }
             guard let webTab = self.tabsController?.activeWebTab else {
-                self.store.update(id: storeId, state: "failed", bytesReceived: 0)
+                self.store.update(id: id, state: "failed", bytesReceived: 0)
                 self.lock.lock()
-                self.lastBytesWritten.removeValue(forKey: storeId)
-                self.downloadFilenames.removeValue(forKey: storeId)
+                self.lastBytesWritten.removeValue(forKey: id)
                 self.lock.unlock()
                 sem.signal()
                 return
@@ -93,21 +88,20 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
                     let download = try await webTab.webView.startDownload(using: request)
                     download.delegate = self
                     self.lock.lock()
-                    self.activeDownloads[storeId] = download
+                    self.activeDownloads[id] = download
                     self.lock.unlock()
                 } catch {
-                    self.store.update(id: storeId, state: "failed", bytesReceived: 0)
+                    self.store.update(id: id, state: "failed", bytesReceived: 0)
                     self.lock.lock()
-                    self.lastBytesWritten.removeValue(forKey: storeId)
-                    self.downloadFilenames.removeValue(forKey: storeId)
+                    self.lastBytesWritten.removeValue(forKey: id)
                     self.lock.unlock()
                     sem.signal()
                 }
             }
         }
 
-        let result = sem.wait(timeout: .now() + 15.0)
-        return (id: storeId, settled: result == .success)
+        _ = sem.wait(timeout: .now() + 15.0)
+        return id
     }
 
     private func loadFixtureData(url: URL) -> Data? {
@@ -152,7 +146,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
                     self.lock.lock()
                     self.activeDownloads.removeValue(forKey: id)
                     self.lastBytesWritten.removeValue(forKey: id)
-                    self.downloadFilenames.removeValue(forKey: id)
                     self.lock.unlock()
                     sem.signal()
                 }
@@ -160,7 +153,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
                 self.store.update(id: id, state: "canceled", bytesReceived: 0)
                 self.lock.lock()
                 self.lastBytesWritten.removeValue(forKey: id)
-                self.downloadFilenames.removeValue(forKey: id)
                 self.lock.unlock()
                 sem.signal()
             }
@@ -179,14 +171,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
             if d === download {
                 matchedId = id
                 break
-            }
-        }
-        if matchedId == nil {
-            let activeIds = Set(activeDownloads.keys)
-            let pendingIds = downloadFilenames.keys.filter { !activeIds.contains($0) }
-            if let lastPending = pendingIds.last {
-                activeDownloads[lastPending] = download
-                matchedId = lastPending
             }
         }
         lock.unlock()
@@ -218,17 +202,8 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
 
         lock.lock()
         let memBytes = lastBytesWritten[id] ?? 0
-        let filename = downloadFilenames[id] ?? store.filename(for: id) ?? "unknown"
         lock.unlock()
-        let filePath = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-        let fileBytes: Int64
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: filePath.path),
-           let size = attrs[.size] as? Int64 {
-            fileBytes = size
-        } else {
-            fileBytes = memBytes
-        }
-        let finalBytes = max(memBytes, fileBytes)
+        let finalBytes = memBytes
 
         store.update(id: id, state: "finished", bytesReceived: Int(finalBytes))
         lock.lock()
@@ -236,7 +211,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
         downloadSemaphores.removeValue(forKey: id)
         activeDownloads.removeValue(forKey: id)
         lastBytesWritten.removeValue(forKey: id)
-        downloadFilenames.removeValue(forKey: id)
         lock.unlock()
     }
 
@@ -252,7 +226,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
         downloadSemaphores.removeValue(forKey: id)
         activeDownloads.removeValue(forKey: id)
         lastBytesWritten.removeValue(forKey: id)
-        downloadFilenames.removeValue(forKey: id)
         lock.unlock()
     }
 
@@ -285,15 +258,14 @@ extension DownloadsController: TestAPIControllerRoutes {
 
         router.post(prefix: Self.routePrefix, path: "/start") { [weak self] req in
             guard let self else { return .notFound() }
-            struct Body: Decodable { let url: String; let id: String? }
+            struct Body: Decodable { let url: String }
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"url\": String}")
             }
             guard let url = URL(string: b.url) else {
                 return .badRequest("invalid URL")
             }
-            let forcedId = b.id
-            let (id, _) = self.start(url: url, forcedId: forcedId)
+            let id = DispatchQueue.main.sync { self.start(url: url) }
             struct StartResponse: Codable { let ok: Bool; let id: String }
             let response = StartResponse(ok: true, id: id)
             let json = try! JSONEncoder().encode(response)
@@ -306,7 +278,7 @@ extension DownloadsController: TestAPIControllerRoutes {
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"id\": String}")
             }
-            _ = self.cancelDownload(id: b.id)
+            DispatchQueue.main.sync { _ = self.cancelDownload(id: b.id) }
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
     }
