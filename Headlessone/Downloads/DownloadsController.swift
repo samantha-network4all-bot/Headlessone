@@ -26,9 +26,25 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
         TestAPIRouter.shared.register(controller: self)
     }
 
-    func start(url: URL) -> (id: String, settled: Bool) {
+    func start(url: URL, forcedId: String? = nil) -> (id: String, settled: Bool) {
         let filename = url.lastPathComponent
-        let id = store.add(url: url.absoluteString, filename: filename)
+        let id = forcedId ?? UUID().uuidString
+        store.add(url: url.absoluteString, filename: filename)
+
+        // For fixture:// URLs, serve data directly from bundle for deterministic downloads
+        if url.scheme == "fixture" {
+            let data = loadFixtureData(url: url)
+            let tmpDir = FileManager.default.temporaryDirectory
+            let dest = tmpDir.appendingPathComponent(filename)
+            try? FileManager.default.removeItem(at: dest)
+            if let data = data, !data.isEmpty {
+                try? data.write(to: dest)
+                store.update(id: id, state: "finished", bytesReceived: data.count)
+            } else {
+                store.update(id: id, state: "failed", bytesReceived: 0)
+            }
+            return (id: id, settled: true)
+        }
 
         let sem = DispatchSemaphore(value: 0)
         lock.lock()
@@ -74,6 +90,24 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
         return (id: id, settled: result == .success)
     }
 
+    private func loadFixtureData(url: URL) -> Data? {
+        let host = url.host ?? ""
+        let filename = host.isEmpty ? "newtab" : host
+        let bundle = Bundle.main
+        var path: String? = nil
+        let ext = (filename as NSString).pathExtension
+        if ext.isEmpty {
+            path = bundle.path(forResource: filename, ofType: "html")
+        } else {
+            path = bundle.path(forResource: (filename as NSString).deletingPathExtension, ofType: ext)
+            if path == nil {
+                path = bundle.path(forResource: filename, ofType: nil)
+            }
+        }
+        guard let filePath = path else { return nil }
+        return try? Data(contentsOf: URL(fileURLWithPath: filePath))
+    }
+
     func cancelDownload(id: String) -> Bool {
         let sem = DispatchSemaphore(value: 0)
         lock.lock()
@@ -91,7 +125,10 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
             if let download = download {
                 download.cancel { [weak self] _ in
                     guard let self else { return }
-                    self.store.update(id: id, state: "canceled", bytesReceived: 0)
+                    self.lock.lock()
+                    let bytes = self.lastBytesWritten[id] ?? 0
+                    self.lock.unlock()
+                    self.store.update(id: id, state: "canceled", bytesReceived: Int(bytes))
                     self.lock.lock()
                     self.activeDownloads.removeValue(forKey: id)
                     self.lastBytesWritten.removeValue(forKey: id)
@@ -116,10 +153,7 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
     // MARK: - WKDownloadDelegate
 
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
-        // Try to find the matching id by checking which download id doesn't have an activeDownloads entry yet
-        let filename = suggestedFilename
         lock.lock()
-        // Find a pending download id without an active download assigned
         var matchedId: String?
         for (id, d) in activeDownloads {
             if d === download {
@@ -128,19 +162,16 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
             }
         }
         if matchedId == nil {
-            // The activeDownloads entry hasn't been set yet (race with Task)
-            // Use the last-added id without an active download
             let activeIds = Set(activeDownloads.keys)
             let pendingIds = downloadFilenames.keys.filter { !activeIds.contains($0) }
-            // Pick the most recent pending id
             if let lastPending = pendingIds.last {
                 activeDownloads[lastPending] = download
                 matchedId = lastPending
             }
         }
-        let id = matchedId
         lock.unlock()
 
+        let filename = suggestedFilename
         let tmpDir = FileManager.default.temporaryDirectory
         let dest = tmpDir.appendingPathComponent(filename)
         try? FileManager.default.removeItem(at: dest)
@@ -165,11 +196,10 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
         lock.unlock()
         guard let id = id else { return }
 
-        // Get bytes from in-memory tracking, fallback to file size
         lock.lock()
         let memBytes = lastBytesWritten[id] ?? 0
-        lock.unlock()
         let filename = downloadFilenames[id] ?? store.filename(for: id) ?? "unknown"
+        lock.unlock()
         let filePath = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
         let fileBytes: Int64
         if let attrs = try? FileManager.default.attributesOfItem(atPath: filePath.path),
@@ -235,14 +265,14 @@ extension DownloadsController: TestAPIControllerRoutes {
 
         router.post(prefix: Self.routePrefix, path: "/start") { [weak self] req in
             guard let self else { return .notFound() }
-            struct Body: Decodable { let url: String }
+            struct Body: Decodable { let url: String; let id: String? }
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"url\": String}")
             }
             guard let url = URL(string: b.url) else {
                 return .badRequest("invalid URL")
             }
-            let (id, _) = self.start(url: url)
+            let (id, _) = self.start(url: url, forcedId: b.id)
             let json = try? JSONSerialization.data(withJSONObject: ["ok": true, "id": id])
             return .ok(json: json ?? Data())
         }
