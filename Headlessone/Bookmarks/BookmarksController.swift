@@ -26,12 +26,12 @@ extension BookmarksController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            var result: [(id: String, entry: BookmarkEntry)] = []
+            var result: [BookmarkEntry] = []
             DispatchQueue.main.sync {
                 result = self.store.list()
             }
-            let items = result.map { pair in
-                ["id": pair.id, "url": pair.entry.url, "title": pair.entry.title, "addedAt": pair.entry.addedAt]
+            let items = result.map { e in
+                ["id": e.id, "url": e.url, "title": e.title, "addedAt": e.addedAt]
             }
             let json = try? JSONSerialization.data(withJSONObject: items)
             return .ok(json: json ?? Data())
@@ -47,7 +47,7 @@ extension BookmarksController: TestAPIControllerRoutes {
             DispatchQueue.main.sync {
                 bookmarkId = self.store.add(url: body.url, title: body.title)
             }
-            let id = bookmarkId ?? "b1"
+            let id = bookmarkId ?? ""
             let json = try? JSONSerialization.data(withJSONObject: ["ok": true, "id": id])
             return .ok(json: json ?? Data())
         }

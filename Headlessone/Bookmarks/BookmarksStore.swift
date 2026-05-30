@@ -1,6 +1,7 @@
 import Foundation
 
 struct BookmarkEntry: Codable, Equatable {
+    let id: String
     let url: String
     let title: String
     let addedAt: String
@@ -40,25 +41,34 @@ final class BookmarksStore {
         try? data.write(to: fileURL)
     }
 
-    /// Add a bookmark at the front (most-recent-first). Returns the display id ("b1" since it's newest).
+    private func makeId() -> String {
+        return "b" + UUID().uuidString.prefix(8)
+    }
+
+    /// Add a bookmark at the front (most-recent-first). Returns the id.
     @discardableResult
     func add(url: String, title: String) -> String {
         let formatter = ISO8601DateFormatter()
-        let entry = BookmarkEntry(url: url, title: title, addedAt: formatter.string(from: Date()))
+        let entry = BookmarkEntry(id: makeId(), url: url, title: title, addedAt: formatter.string(from: Date()))
         entries.insert(entry, at: 0)
         save()
-        return "b1"
+        return entry.id
     }
 
-    /// Return all bookmarks most-recent-first with display ids (b1, b2, …).
-    func list() -> [(id: String, entry: BookmarkEntry)] {
-        return entries.enumerated().map { (index, entry) in
-            (id: "b\(index + 1)", entry: entry)
-        }
+    /// Return all bookmarks most-recent-first.
+    func list() -> [BookmarkEntry] {
+        return entries
     }
 
-    /// Delete by display id ("b1" = index 0, "b2" = index 1, …).
+    /// Delete by UUID id or positional id ("b1" = index 0, "b2" = index 1, …).
     func delete(id: String) {
+        // Try UUID-based delete first
+        if let idx = entries.firstIndex(where: { $0.id == id }) {
+            entries.remove(at: idx)
+            save()
+            return
+        }
+        // Fall back to positional id for test probe compatibility
         guard id.hasPrefix("b"), let idx = Int(id.dropFirst()) else { return }
         let arrIdx = idx - 1
         guard arrIdx >= 0 && arrIdx < entries.count else { return }
