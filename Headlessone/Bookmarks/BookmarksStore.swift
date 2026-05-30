@@ -1,6 +1,5 @@
 import Foundation
 
-// MARK: - BookmarkEntry
 struct BookmarkEntry: Codable, Equatable {
     let id: String
     let url: String
@@ -42,6 +41,7 @@ final class BookmarksStore {
         try? data.write(to: fileURL)
     }
 
+    /// Append a new bookmark. Returns the internal UUID.
     @discardableResult
     func add(url: String, title: String) -> String {
         let id = UUID().uuidString
@@ -52,12 +52,29 @@ final class BookmarksStore {
         return id
     }
 
-    func list() -> [BookmarkEntry] {
-        return entries.reversed()
+    /// Return bookmarks most-recent-first (reversed insertion order).
+    /// `displayId` is the 1-based positional index ("b1", b2", …) for the API.
+    func list() -> [(entry: BookmarkEntry, displayId: String)] {
+        let reversed = entries.reversed()
+        return reversed.enumerated().map { (index, entry) in
+            (entry: entry, displayId: "b\(index + 1)")
+        }
     }
 
-    func delete(id: String) {
-        entries.removeAll { $0.id == id }
+    /// Delete by positional display id ("b1" = first in most-recent-first list).
+    func delete(displayId: String) {
+        guard let idx = Int(displayId.dropFirst()), idx >= 1 else { return }
+        // Convert display position (1-based, most-recent-first) to entries array index.
+        // Most-recent-first index 1 → last element of entries → entries.count - 1
+        // Most-recent-first index idx → entries.count - idx
+        let arrIdx = entries.count - idx
+        guard arrIdx >= 0 && arrIdx < entries.count else { return }
+        entries.remove(at: arrIdx)
+        save()
+    }
+
+    func clear() {
+        entries = []
         save()
     }
 }
