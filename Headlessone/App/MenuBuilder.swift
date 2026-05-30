@@ -28,6 +28,8 @@ final class MenuBuilder {
         viewMenuItem.submenu = viewMenu
         viewMenu.addItem(NSMenuItem(title: "Reload", action: #selector(AppController.reload(_:)), keyEquivalent: "r"))
         viewMenu.addItem(NSMenuItem(title: "Stop", action: #selector(AppController.stop(_:)), keyEquivalent: "."))
+        viewMenu.addItem(NSMenuItem.separator())
+        viewMenu.addItem(NSMenuItem(title: "Find…", action: #selector(AppController.find(_:)), keyEquivalent: "f"))
 
         NSApp.mainMenu = mainMenu
     }
@@ -53,6 +55,12 @@ extension AppController {
     @objc func stop(_ sender: Any?) {
         DispatchQueue.main.async { [weak self] in
             self?.tabsController.activeWebTab?.webView.stopLoading()
+        }
+    }
+
+    @objc func find(_ sender: Any?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.findController?.toggleFindBar()
         }
     }
 }

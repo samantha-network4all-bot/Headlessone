@@ -5,6 +5,7 @@ final class AppController: NSViewController {
     var windowController: WindowController!
     var tabsController: TabsController!
     var omniboxController: OmniboxController!
+    var findController: FindController!
     private var testAPIServer: TestAPIServer?
 
     init() {
@@ -60,6 +61,11 @@ final class AppController: NSViewController {
         root.toolbarView.onOmniboxSubmit = { [weak self] text in
             _ = self?.omniboxController.submit(text: text)
         }
+
+        // Create find controller
+        findController = FindController()
+        findController.tabsController = tabsController
+        _ = findController.view // triggers viewDidLoad so /find/* routes register
 
         // Register routes (top-level orchestrator routes)
         TestAPIRouter.shared.register(controller: self)

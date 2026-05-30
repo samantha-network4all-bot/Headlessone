@@ -5,7 +5,7 @@ final class TabsController: NSViewController {
     let state = TabsState()
     private var webTabs: [String: WebTab] = [:]
     var tabController: TabController!
-    private var windowController: WindowController!
+    var windowController: WindowController!
 
     init(windowController: WindowController) {
         self.windowController = windowController
