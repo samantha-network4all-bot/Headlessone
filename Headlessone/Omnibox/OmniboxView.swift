@@ -1,7 +1,9 @@
 import AppKit
 
-final class OmniboxView: NSTextField {
+final class OmniboxView: NSTextField, NSTextFieldDelegate {
     var onSubmit: ((String) -> Void)?
+    var onBeginEditing: (() -> Void)?
+    var onEndEditing: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -9,7 +11,7 @@ final class OmniboxView: NSTextField {
         self.font = NSFont.systemFont(ofSize: 13)
         self.target = self
         self.action = #selector(submit)
-        self.delegate = nil
+        self.delegate = self
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -17,6 +19,18 @@ final class OmniboxView: NSTextField {
     @objc private func submit() {
         onSubmit?(stringValue)
     }
+
+    // MARK: - NSTextFieldDelegate
+
+    func controlTextDidBeginEditing(_ obj: Notification) {
+        onBeginEditing?()
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        onEndEditing?()
+    }
+
+    // MARK: - Helpers
 
     func setEditingURL(_ url: String) {
         stringValue = url

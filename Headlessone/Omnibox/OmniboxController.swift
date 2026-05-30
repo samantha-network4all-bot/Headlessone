@@ -2,6 +2,7 @@ import AppKit
 
 final class OmniboxController: NSViewController {
     let state = OmniboxState()
+    let omniboxView = OmniboxView(frame: .zero)
     weak var tabsController: TabsController?
 
     init() {
@@ -11,11 +12,25 @@ final class OmniboxController: NSViewController {
     required init?(coder: NSCoder) { fatalError() }
 
     override func loadView() {
-        view = NSView()
+        view = omniboxView
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        omniboxView.onSubmit = { [weak self] text in
+            _ = self?.submit(text: text)
+        }
+        omniboxView.onBeginEditing = { [weak self] in
+            guard let self else { return }
+            let url = self.tabsController?.activeWebTab?.url?.absoluteString ?? self.state.text
+            self.omniboxView.setEditingURL(url)
+        }
+        omniboxView.onEndEditing = { [weak self] in
+            guard let self else { return }
+            if let url = self.tabsController?.activeWebTab?.url?.absoluteString {
+                self.omniboxView.syncFromActiveTab(url: url)
+            }
+        }
         TestAPIRouter.shared.register(controller: self)
     }
 
@@ -39,14 +54,19 @@ final class OmniboxController: NSViewController {
         return "https://duckduckgo.com/?q=\(escaped)"
     }
 
-    func submit(text: String) -> String {
+    @discardableResult
+    func submit(text: String) -> (navigatedTo: String, ok: Bool) {
         let url = resolveURL(from: text)
-        guard let targetURL = URL(string: url) else { return url }
+        guard let targetURL = URL(string: url) else {
+            state.text = url
+            return (url, true)
+        }
         if let webTab = tabsController?.activeWebTab {
             webTab.navigateSynchronously(url: targetURL)
         }
         state.text = url
-        return url
+        omniboxView.stringValue = url
+        return (url, true)
     }
 }
 
@@ -60,13 +80,13 @@ extension OmniboxController: TestAPIControllerRoutes {
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"text\": String}")
             }
-            var navigatedTo = ""
+            var result: (navigatedTo: String, ok: Bool) = ("", false)
             DispatchQueue.main.sync {
-                navigatedTo = self.submit(text: b.text)
+                result = self.submit(text: b.text)
             }
             struct SubmitResponse: Codable { let ok: Bool; let navigatedTo: String }
-            let body = try? JSONEncoder().encode(SubmitResponse(ok: true, navigatedTo: navigatedTo))
-            return .ok(json: body ?? Data())
+            let bodyData = try? JSONEncoder().encode(SubmitResponse(ok: result.ok, navigatedTo: result.navigatedTo))
+            return .ok(json: bodyData ?? Data())
         }
 
         router.get(prefix: Self.routePrefix, path: "/state") { [weak self] _ in
