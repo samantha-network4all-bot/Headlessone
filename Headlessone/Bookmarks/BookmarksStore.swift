@@ -1,7 +1,6 @@
 import Foundation
 
 struct BookmarkEntry: Codable, Equatable {
-    let id: String
     let url: String
     let title: String
     let addedAt: String
@@ -41,33 +40,27 @@ final class BookmarksStore {
         try? data.write(to: fileURL)
     }
 
-    /// Append a new bookmark. Returns the internal UUID.
+    /// Add a bookmark at the front (most-recent-first). Returns the display id ("b1" since it's newest).
     @discardableResult
     func add(url: String, title: String) -> String {
-        let id = UUID().uuidString
         let formatter = ISO8601DateFormatter()
-        let entry = BookmarkEntry(id: id, url: url, title: title, addedAt: formatter.string(from: Date()))
-        entries.append(entry)
+        let entry = BookmarkEntry(url: url, title: title, addedAt: formatter.string(from: Date()))
+        entries.insert(entry, at: 0)
         save()
-        return id
+        return "b1"
     }
 
-    /// Return bookmarks most-recent-first (reversed insertion order).
-    /// `displayId` is the 1-based positional index ("b1", b2", …) for the API.
-    func list() -> [(entry: BookmarkEntry, displayId: String)] {
-        let reversed = entries.reversed()
-        return reversed.enumerated().map { (index, entry) in
-            (entry: entry, displayId: "b\(index + 1)")
+    /// Return all bookmarks most-recent-first with display ids (b1, b2, …).
+    func list() -> [(id: String, entry: BookmarkEntry)] {
+        return entries.enumerated().map { (index, entry) in
+            (id: "b\(index + 1)", entry: entry)
         }
     }
 
-    /// Delete by positional display id ("b1" = first in most-recent-first list).
-    func delete(displayId: String) {
-        guard let idx = Int(displayId.dropFirst()), idx >= 1 else { return }
-        // Convert display position (1-based, most-recent-first) to entries array index.
-        // Most-recent-first index 1 → last element of entries → entries.count - 1
-        // Most-recent-first index idx → entries.count - idx
-        let arrIdx = entries.count - idx
+    /// Delete by display id ("b1" = index 0, "b2" = index 1, …).
+    func delete(id: String) {
+        guard id.hasPrefix("b"), let idx = Int(id.dropFirst()) else { return }
+        let arrIdx = idx - 1
         guard arrIdx >= 0 && arrIdx < entries.count else { return }
         entries.remove(at: arrIdx)
         save()

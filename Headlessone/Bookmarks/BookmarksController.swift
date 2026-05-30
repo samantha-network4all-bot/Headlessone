@@ -26,12 +26,12 @@ extension BookmarksController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            var result: [(entry: BookmarkEntry, displayId: String)] = []
+            var result: [(id: String, entry: BookmarkEntry)] = []
             DispatchQueue.main.sync {
                 result = self.store.list()
             }
             let items = result.map { pair in
-                ["id": pair.displayId, "url": pair.entry.url, "title": pair.entry.title, "addedAt": pair.entry.addedAt]
+                ["id": pair.id, "url": pair.entry.url, "title": pair.entry.title, "addedAt": pair.entry.addedAt]
             }
             let json = try? JSONSerialization.data(withJSONObject: items)
             return .ok(json: json ?? Data())
@@ -43,15 +43,12 @@ extension BookmarksController: TestAPIControllerRoutes {
             guard let body = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"url\": String, \"title\": String}")
             }
-            var displayId: String?
+            var bookmarkId: String?
             DispatchQueue.main.sync {
-                _ = self.store.add(url: body.url, title: body.title)
-                // After adding, the new entry is last in entries.
-                // In the reversed list (most-recent-first), it appears at position 0 → displayId "b1"
-                displayId = "b1"
+                bookmarkId = self.store.add(url: body.url, title: body.title)
             }
-            let response = ["ok": true, "id": displayId ?? "b1"]
-            let json = try? JSONSerialization.data(withJSONObject: response)
+            let id = bookmarkId ?? "b1"
+            let json = try? JSONSerialization.data(withJSONObject: ["ok": true, "id": id])
             return .ok(json: json ?? Data())
         }
 
@@ -62,7 +59,7 @@ extension BookmarksController: TestAPIControllerRoutes {
                 return .badRequest("body must be {\"id\": String}")
             }
             DispatchQueue.main.sync {
-                self.store.delete(displayId: body.id)
+                self.store.delete(id: body.id)
             }
             let json = try? JSONSerialization.data(withJSONObject: ["ok": true])
             return .ok(json: json ?? Data())
