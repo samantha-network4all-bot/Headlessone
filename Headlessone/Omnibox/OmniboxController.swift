@@ -105,6 +105,8 @@ extension OmniboxController: TestAPIControllerRoutes {
 
         router.get(prefix: Self.routePrefix, path: "/state") { [weak self] _ in
             guard let self else { return .notFound() }
+            // Read state.text directly — route handlers all execute on the
+            // same serial background queue, so no main-sync is needed.
             let text = self.state.text
             let body = try? JSONEncoder().encode(["text": text])
             return .ok(json: body ?? Data())
