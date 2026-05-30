@@ -43,11 +43,10 @@ extension BookmarksController: TestAPIControllerRoutes {
             guard let body = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"url\": String, \"title\": String}")
             }
-            var bookmarkId: String?
+            var id = ""
             DispatchQueue.main.sync {
-                bookmarkId = self.store.add(url: body.url, title: body.title)
+                id = self.store.add(url: body.url, title: body.title)
             }
-            let id = bookmarkId ?? ""
             let json = try? JSONSerialization.data(withJSONObject: ["ok": true, "id": id])
             return .ok(json: json ?? Data())
         }
@@ -61,8 +60,7 @@ extension BookmarksController: TestAPIControllerRoutes {
             DispatchQueue.main.sync {
                 self.store.delete(id: body.id)
             }
-            let json = try? JSONSerialization.data(withJSONObject: ["ok": true])
-            return .ok(json: json ?? Data())
+            return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
     }
 }
