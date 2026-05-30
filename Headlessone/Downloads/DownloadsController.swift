@@ -279,9 +279,10 @@ extension DownloadsController: TestAPIControllerRoutes {
             guard let url = URL(string: b.url) else {
                 return .badRequest("invalid URL")
             }
-            let (id, _) = self.start(url: url, forcedId: b.id)
-            let json = try? JSONSerialization.data(withJSONObject: ["ok": true, "id": id])
-            return .ok(json: json ?? Data())
+            let forcedId = b.id
+            let (id, _) = self.start(url: url, forcedId: forcedId)
+            let json = try! JSONSerialization.data(withJSONObject: ["ok": true, "id": id])
+            return .ok(json: json)
         }
 
         router.post(prefix: Self.routePrefix, path: "/cancel") { [weak self] req in

@@ -83,6 +83,7 @@ final class AppController: NSViewController {
         // Create downloads controller
         downloadsController = DownloadsController()
         downloadsController.tabsController = tabsController
+        tabsController.downloadsController = downloadsController
         _ = downloadsController.view // triggers viewDidLoad so /downloads/* routes register
 
         // Wire history recording onto all current and future tabs
