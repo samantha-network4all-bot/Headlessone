@@ -10,7 +10,7 @@ struct BookmarkEntry: Codable, Equatable {
 final class BookmarksStore {
     private let fileURL: URL
     private var entries: [BookmarkEntry] = []
-    private var nextId: Int = 1
+    private var nextId: Int = 0
 
     init() {
         let isTest = ProcessInfo.processInfo.environment["HEADLESSONE_TEST_API"] == "1"
@@ -32,11 +32,11 @@ final class BookmarksStore {
         guard let data = try? Data(contentsOf: fileURL),
               let decoded = try? JSONDecoder().decode([BookmarkEntry].self, from: data) else {
             entries = []
-            nextId = 1
+            nextId = 0
             return
         }
         entries = decoded
-        nextId = (entries.compactMap { Int($0.id.replacingOccurrences(of: "b", with: "")) }.max() ?? 0) + 1
+        nextId = (entries.compactMap { Int($0.id.replacingOccurrences(of: ".b", with: "")) }.max() ?? 0) + 1
     }
 
     private func save() {
@@ -46,7 +46,7 @@ final class BookmarksStore {
 
     @discardableResult
     func add(url: String, title: String) -> String {
-        let id = "b\(nextId)"
+        let id = ".b\(nextId)"
         nextId += 1
         let formatter = ISO8601DateFormatter()
         let entry = BookmarkEntry(id: id, url: url, title: title, addedAt: formatter.string(from: Date()))
@@ -60,13 +60,14 @@ final class BookmarksStore {
     }
 
     func delete(id: String) {
-        entries.removeAll { $0.id == id }
+        let normalized = id.hasPrefix(".") ? id : "." + id
+        entries.removeAll { $0.id == normalized }
         save()
     }
 
     func clear() {
         entries = []
-        nextId = 1
+        nextId = 0
         save()
     }
 }
