@@ -58,32 +58,42 @@ final class OmniboxController: NSViewController {
     func submit(text: String) -> (navigatedTo: String, ok: Bool) {
         let url = resolveURL(from: text)
         guard let targetURL = URL(string: url) else {
-            state.text = url
+            syncStateFromTab()
             return (url, true)
         }
         if let webTab = tabsController?.activeWebTab {
             webTab.navigateSynchronously(url: targetURL)
         }
-        state.text = url
-        omniboxView.stringValue = url
+        syncStateFromTab()
         return (url, true)
     }
 
     private func resolveAndNavigate(text: String) -> String {
         let url = resolveURL(from: text)
         guard let targetURL = URL(string: url) else {
-            self.state.text = url
-            DispatchQueue.main.sync {
-                self.omniboxView.stringValue = url
-            }
+            syncStateFromTab()
             return url
         }
         self.tabsController?.activeWebTab?.navigateSynchronously(url: targetURL)
-        self.state.text = url
-        DispatchQueue.main.sync {
-            self.omniboxView.stringValue = url
-        }
+        syncStateFromTab()
         return url
+    }
+
+    private func syncStateFromTab() {
+        var tabUrl: String?
+        if Thread.isMainThread {
+            tabUrl = tabsController?.activeWebTab?.url?.absoluteString
+        } else {
+            DispatchQueue.main.sync {
+                tabUrl = self.tabsController?.activeWebTab?.url?.absoluteString
+            }
+        }
+        if let u = tabUrl {
+            self.state.text = u
+            DispatchQueue.main.sync {
+                self.omniboxView.stringValue = u
+            }
+        }
     }
 }
 
