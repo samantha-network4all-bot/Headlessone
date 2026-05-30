@@ -7,6 +7,7 @@ final class AppController: NSViewController {
     var omniboxController: OmniboxController!
     var findController: FindController!
     var historyController: HistoryController!
+    var bookmarksController: BookmarksController!
     private var testAPIServer: TestAPIServer?
 
     init() {
@@ -72,6 +73,11 @@ final class AppController: NSViewController {
         historyController = HistoryController()
         historyController.tabsController = tabsController
         _ = historyController.view // triggers viewDidLoad so /history/* routes register
+
+        // Create bookmarks controller
+        bookmarksController = BookmarksController()
+        bookmarksController.tabsController = tabsController
+        _ = bookmarksController.view // triggers viewDidLoad so /bookmarks/* routes register
 
         // Wire history recording onto all current and future tabs
         let historyCallback: (URL, String) -> Void = { [weak self] url, title in

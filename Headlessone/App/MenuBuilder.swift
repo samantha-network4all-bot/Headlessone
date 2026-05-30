@@ -31,6 +31,14 @@ final class MenuBuilder {
         viewMenu.addItem(NSMenuItem.separator())
         viewMenu.addItem(NSMenuItem(title: "Find…", action: #selector(AppController.find(_:)), keyEquivalent: "f"))
 
+        // Bookmarks menu
+        let bookmarksMenuItem = NSMenuItem()
+        mainMenu.addItem(bookmarksMenuItem)
+        let bookmarksMenu = NSMenu(title: "Bookmarks")
+        bookmarksMenuItem.submenu = bookmarksMenu
+        bookmarksMenu.addItem(NSMenuItem(title: "Add Bookmark", action: #selector(AppController.addBookmark(_:)), keyEquivalent: "d"))
+        bookmarksMenu.addItem(NSMenuItem(title: "Show Bookmarks", action: #selector(AppController.showBookmarks(_:)), keyEquivalent: ""))
+
         // History menu
         let historyMenuItem = NSMenuItem()
         mainMenu.addItem(historyMenuItem)
@@ -95,5 +103,13 @@ extension AppController {
         DispatchQueue.main.async { [weak self] in
             self?.historyController.store.clear()
         }
+    }
+
+    @objc func addBookmark(_ sender: Any?) {
+        // Placeholder — will use active tab URL/title via BookmarksController
+    }
+
+    @objc func showBookmarks(_ sender: Any?) {
+        // Placeholder — no panel required for this slice
     }
 }
