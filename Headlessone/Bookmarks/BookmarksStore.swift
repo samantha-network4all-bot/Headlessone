@@ -27,21 +27,26 @@ final class BookmarksStore {
         load()
     }
 
+    private var nextId: Int = 1
+
     private func load() {
         guard let data = try? Data(contentsOf: fileURL),
               let decoded = try? JSONDecoder().decode([BookmarkEntry].self, from: data) else {
             entries = []
+            nextId = 1
             return
         }
         entries = decoded
+        nextId = (entries.compactMap { entry in
+            guard entry.id.hasPrefix("b"), let n = Int(entry.id.dropFirst()) else { return nil }
+            return n
+        }.max() ?? 0) + 1
     }
 
     private func save() {
         guard let data = try? JSONEncoder().encode(entries) else { return }
         try? data.write(to: fileURL)
     }
-
-    private var nextId: Int = 1
 
     private func makeId() -> String {
         let id = "b\(nextId)"
