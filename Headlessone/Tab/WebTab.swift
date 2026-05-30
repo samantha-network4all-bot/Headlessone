@@ -144,12 +144,27 @@ final class WebTab: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loadState = "finished"
         if let u = webView.url { url = u }
-        if let t = webView.title, !t.isEmpty { title = t }
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
         navigationFinished = true
+        // Get title from the committed URL's fixture HTML or webView.title
+        var finalTitle = "New Tab"
+        if let t = webView.title, !t.isEmpty {
+            finalTitle = t
+            title = t
+        } else {
+            // webView.title is empty for fixture URLs; derive from the URL path
+            if let host = url?.host, !host.isEmpty && host != "newtab" {
+                // Capitalize the fixture name as its title (login → Login, links → Links)
+                finalTitle = host.prefix(1).uppercased() + host.dropFirst()
+                title = finalTitle
+            } else if url?.host == "newtab" || url?.absoluteString == "fixture://newtab" {
+                finalTitle = "New Tab"
+                title = finalTitle
+            }
+        }
         if let u = url {
-            self.onNavigationFinished?(u, title)
+            self.onNavigationFinished?(u, finalTitle)
         }
     }
 

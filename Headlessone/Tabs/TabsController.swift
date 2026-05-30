@@ -28,7 +28,13 @@ final class TabsController: NSViewController {
         // Create initial tab
         let id = state.newTabId()
         let webTab = WebTab(id: id, configuration: WebConfig.shared.configuration)
-        webTab.onNavigationFinished = onNavigationFinished
+        let parentCallback = onNavigationFinished
+        webTab.onNavigationFinished = { [weak self] url, title in
+            parentCallback?(url, title)
+            DispatchQueue.main.async {
+                self?.windowController?.rootView.tabStripView.updateTabTitle(id: id, title: title)
+            }
+        }
         webTabs[id] = webTab
         state.addTab(id: id, url: "fixture://newtab", title: "New Tab", activate: true)
 
@@ -56,7 +62,14 @@ final class TabsController: NSViewController {
     func newTab(url: String = "fixture://newtab") -> String {
         let id = state.newTabId()
         let webTab = WebTab(id: id, configuration: WebConfig.shared.configuration)
-        webTab.onNavigationFinished = onNavigationFinished
+        let parentCallback = onNavigationFinished
+        webTab.onNavigationFinished = { [weak self] url, title in
+            parentCallback?(url, title)
+            // Update the tab strip title synchronously
+            DispatchQueue.main.async {
+                self?.windowController?.rootView.tabStripView.updateTabTitle(id: id, title: title)
+            }
+        }
         webTabs[id] = webTab
         state.addTab(id: id, url: url, title: "New Tab", activate: true)
         windowController.rootView.tabStripView.addTabButton(id: id, title: "New Tab", active: true)
