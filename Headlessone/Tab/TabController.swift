@@ -70,8 +70,7 @@ extension TabController: TestAPIControllerRoutes {
         router.post(prefix: Self.routePrefix, path: "/back") { [weak self] _ in
             guard let self else { return .notFound() }
             DispatchQueue.main.sync {
-                self.activeWebTab()?.webView.goBack()
-                return ()
+                self.activeWebTab()?.goBackSynchronously()
             }
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
@@ -79,8 +78,7 @@ extension TabController: TestAPIControllerRoutes {
         router.post(prefix: Self.routePrefix, path: "/forward") { [weak self] _ in
             guard let self else { return .notFound() }
             DispatchQueue.main.sync {
-                self.activeWebTab()?.webView.goForward()
-                return ()
+                self.activeWebTab()?.goForwardSynchronously()
             }
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
@@ -88,8 +86,7 @@ extension TabController: TestAPIControllerRoutes {
         router.post(prefix: Self.routePrefix, path: "/reload") { [weak self] _ in
             guard let self else { return .notFound() }
             DispatchQueue.main.sync {
-                self.activeWebTab()?.webView.reload()
-                return ()
+                self.activeWebTab()?.reloadSynchronously()
             }
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }

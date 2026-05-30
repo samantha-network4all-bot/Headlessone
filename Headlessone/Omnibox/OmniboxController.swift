@@ -69,11 +69,6 @@ final class OmniboxController: NSViewController {
         return (url, true)
     }
 
-    private func isLocalScheme(_ url: String) -> Bool {
-        let lower = url.lowercased()
-        return lower.hasPrefix("fixture://") || lower.hasPrefix("file://") || lower.hasPrefix("data:")
-    }
-
     private func resolveAndNavigate(text: String) -> String {
         let url = resolveURL(from: text)
         guard let targetURL = URL(string: url) else {
@@ -86,11 +81,7 @@ final class OmniboxController: NSViewController {
         DispatchQueue.main.sync {
             self.state.text = url
             self.omniboxView.stringValue = url
-            if self.isLocalScheme(url) {
-                self.tabsController?.activeWebTab?.navigateSynchronously(url: targetURL)
-            } else {
-                self.tabsController?.activeWebTab?.load(url: targetURL)
-            }
+            self.tabsController?.activeWebTab?.navigateSynchronously(url: targetURL)
         }
         return url
     }

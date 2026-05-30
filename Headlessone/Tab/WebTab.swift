@@ -72,6 +72,51 @@ final class WebTab: NSObject, WKNavigationDelegate {
         }
     }
 
+    func goBackSynchronously(timeout: TimeInterval = 15.0) {
+        if webView.canGoBack {
+            navigationFinished = false
+            if Thread.isMainThread {
+                webView.goBack()
+            } else {
+                DispatchQueue.main.sync { self.webView.goBack() }
+            }
+            waitForSettled(timeout: timeout)
+        }
+    }
+
+    func goForwardSynchronously(timeout: TimeInterval = 15.0) {
+        if webView.canGoForward {
+            navigationFinished = false
+            if Thread.isMainThread {
+                webView.goForward()
+            } else {
+                DispatchQueue.main.sync { self.webView.goForward() }
+            }
+            waitForSettled(timeout: timeout)
+        }
+    }
+
+    func reloadSynchronously(timeout: TimeInterval = 15.0) {
+        navigationFinished = false
+        if Thread.isMainThread {
+            webView.reload()
+        } else {
+            DispatchQueue.main.sync { self.webView.reload() }
+        }
+        waitForSettled(timeout: timeout)
+    }
+
+    private func waitForSettled(timeout: TimeInterval) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !navigationFinished && Date() < deadline {
+            if Thread.isMainThread {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
+            } else {
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+        }
+    }
+
     @objc override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         if keyPath == #keyPath(WKWebView.estimatedProgress) {
             progress = webView.estimatedProgress

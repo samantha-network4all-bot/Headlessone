@@ -42,6 +42,24 @@ final class AppController: NSViewController {
         omniboxController.tabsController = tabsController
         _ = omniboxController.view
 
+        // Wire toolbar buttons to TabController actions
+        let root = windowController.rootView
+        root.toolbarView.onBack = { [weak self] in
+            self?.tabsController.activeWebTab?.goBackSynchronously()
+        }
+        root.toolbarView.onForward = { [weak self] in
+            self?.tabsController.activeWebTab?.goForwardSynchronously()
+        }
+        root.toolbarView.onReload = { [weak self] in
+            self?.tabsController.activeWebTab?.reloadSynchronously()
+        }
+        root.toolbarView.onStop = { [weak self] in
+            self?.tabsController.activeWebTab?.webView.stopLoading()
+        }
+        root.toolbarView.onOmniboxSubmit = { [weak self] text in
+            _ = self?.omniboxController.submit(text: text)
+        }
+
         // Register routes (top-level orchestrator routes)
         TestAPIRouter.shared.register(controller: self)
 
