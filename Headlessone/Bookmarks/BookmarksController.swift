@@ -43,11 +43,13 @@ extension BookmarksController: TestAPIControllerRoutes {
             guard let body = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"url\": String, \"title\": String}")
             }
-            var id = ""
+            var response: [String: Any]?
             DispatchQueue.main.sync {
-                id = self.store.add(url: body.url, title: body.title)
+                let id = self.store.add(url: body.url, title: body.title)
+                response = ["ok": true, "id": id]
             }
-            return .ok(json: Data("{\"ok\":true,\"id\":\"\(id)\"}\n".utf8))
+            let json = try? JSONSerialization.data(withJSONObject: response ?? [:])
+            return .ok(json: json ?? Data())
         }
 
         router.post(prefix: Self.routePrefix, path: "/delete") { [weak self] req in
@@ -59,7 +61,8 @@ extension BookmarksController: TestAPIControllerRoutes {
             DispatchQueue.main.sync {
                 self.store.delete(id: body.id)
             }
-            return .ok(json: Data("{\"ok\":true}\n".utf8))
+            let json = try? JSONSerialization.data(withJSONObject: ["ok": true])
+            return .ok(json: json ?? Data())
         }
     }
 }
