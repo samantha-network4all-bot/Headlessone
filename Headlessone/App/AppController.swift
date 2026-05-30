@@ -8,6 +8,7 @@ final class AppController: NSViewController {
     var findController: FindController!
     var historyController: HistoryController!
     var bookmarksController: BookmarksController!
+    var downloadsController: DownloadsController!
     private var testAPIServer: TestAPIServer?
 
     init() {
@@ -79,6 +80,11 @@ final class AppController: NSViewController {
         bookmarksController.tabsController = tabsController
         _ = bookmarksController.view // triggers viewDidLoad so /bookmarks/* routes register
 
+        // Create downloads controller
+        downloadsController = DownloadsController()
+        downloadsController.tabsController = tabsController
+        _ = downloadsController.view // triggers viewDidLoad so /downloads/* routes register
+
         // Wire history recording onto all current and future tabs
         let historyCallback: (URL, String) -> Void = { [weak self] url, title in
             guard let self else { return }
@@ -89,6 +95,22 @@ final class AppController: NSViewController {
         for tabInfo in tabsController.allTabInfos() {
             if let webTab = tabsController.webTab(for: tabInfo.id) {
                 webTab.onNavigationFinished = historyCallback
+            }
+        }
+
+        // Wire download start closure
+        tabsController.onDownloadStart = { [weak self] url in
+            guard let self else { return }
+            _ = self.downloadsController.start(url: url)
+        }
+        // Set download delegate on tabs controller level and existing webtabs
+        for tabInfo in tabsController.allTabInfos() {
+            if let webTab = tabsController.webTab(for: tabInfo.id) {
+                webTab.onDownloadStart = { [weak self] url in
+                    guard let self else { return }
+                    _ = self.downloadsController.start(url: url)
+                }
+                webTab.downloadDelegate = downloadsController
             }
         }
 

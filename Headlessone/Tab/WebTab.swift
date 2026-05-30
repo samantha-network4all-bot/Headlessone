@@ -5,6 +5,8 @@ final class WebTab: NSObject, WKNavigationDelegate {
     let webView: WKWebView
 
     var onNavigationFinished: ((URL, String) -> Void)?
+    var onDownloadStart: ((URL) -> Void)?
+    var downloadDelegate: WKDownloadDelegate?
 
     private(set) var url: URL?
     private(set) var title: String = "New Tab"
@@ -182,5 +184,18 @@ final class WebTab: NSObject, WKNavigationDelegate {
         // no-op
     }
 
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences, decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
+        decisionHandler(.allow, preferences)
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        download.delegate = downloadDelegate
+        guard let requestURL = download.originalRequest?.url else { return }
+        onDownloadStart?(requestURL)
+    }
 
 }

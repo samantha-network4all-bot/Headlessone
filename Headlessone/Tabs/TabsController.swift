@@ -7,6 +7,7 @@ final class TabsController: NSViewController {
     var tabController: TabController!
     var windowController: WindowController!
     var onNavigationFinished: ((URL, String) -> Void)?
+    var onDownloadStart: ((URL) -> Void)?
 
     init(windowController: WindowController) {
         self.windowController = windowController
@@ -34,6 +35,10 @@ final class TabsController: NSViewController {
             DispatchQueue.main.async {
                 self?.windowController?.rootView.tabStripView.updateTabTitle(id: id, title: title)
             }
+        }
+        let parentDownloadCallback = onDownloadStart
+        webTab.onDownloadStart = { url in
+            parentDownloadCallback?(url)
         }
         webTabs[id] = webTab
         state.addTab(id: id, url: "fixture://newtab", title: "New Tab", activate: true)
@@ -69,6 +74,10 @@ final class TabsController: NSViewController {
             DispatchQueue.main.async {
                 self?.windowController?.rootView.tabStripView.updateTabTitle(id: id, title: title)
             }
+        }
+        let parentDownloadCallback = onDownloadStart
+        webTab.onDownloadStart = { url in
+            parentDownloadCallback?(url)
         }
         webTabs[id] = webTab
         state.addTab(id: id, url: url, title: "New Tab", activate: true)
