@@ -25,26 +25,42 @@ final class TabController: NSViewController {
     }
 
     func goBack() {
-        DispatchQueue.main.sync {
+        if Thread.isMainThread {
             self.activeWebTab()?.goBackSynchronously()
+        } else {
+            DispatchQueue.main.sync {
+                self.activeWebTab()?.goBackSynchronously()
+            }
         }
     }
 
     func goForward() {
-        DispatchQueue.main.sync {
+        if Thread.isMainThread {
             self.activeWebTab()?.goForwardSynchronously()
+        } else {
+            DispatchQueue.main.sync {
+                self.activeWebTab()?.goForwardSynchronously()
+            }
         }
     }
 
     func reload() {
-        DispatchQueue.main.sync {
+        if Thread.isMainThread {
             self.activeWebTab()?.reloadSynchronously()
+        } else {
+            DispatchQueue.main.sync {
+                self.activeWebTab()?.reloadSynchronously()
+            }
         }
     }
 
     func stop() {
-        DispatchQueue.main.sync {
+        if Thread.isMainThread {
             self.activeWebTab()?.webView.stopLoading()
+        } else {
+            DispatchQueue.main.sync {
+                self.activeWebTab()?.webView.stopLoading()
+            }
         }
     }
 }
