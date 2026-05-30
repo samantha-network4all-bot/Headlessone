@@ -40,7 +40,7 @@ final class WebTab: NSObject, WKNavigationDelegate {
         DispatchQueue.main.async { [weak self] in
             self?.loadState = "loading"
             self?.url = url
-            self?.webView.load(URLRequest(url: url))
+            self?.webView.load(URLRequest(url: url, timeoutInterval: 5.0))
         }
         return true
     }
@@ -49,15 +49,16 @@ final class WebTab: NSObject, WKNavigationDelegate {
 
     func navigateSynchronously(url: URL, timeout: TimeInterval = 15.0) {
         navigationFinished = false
+        let request = URLRequest(url: url, timeoutInterval: min(5.0, timeout))
         if Thread.isMainThread {
             self.loadState = "loading"
             self.url = url
-            self.webView.load(URLRequest(url: url))
+            self.webView.load(request)
         } else {
             DispatchQueue.main.sync {
                 self.loadState = "loading"
                 self.url = url
-                self.webView.load(URLRequest(url: url))
+                self.webView.load(request)
             }
         }
         let deadline = Date().addingTimeInterval(timeout)
