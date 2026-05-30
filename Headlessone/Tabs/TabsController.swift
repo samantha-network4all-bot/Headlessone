@@ -7,7 +7,7 @@ final class TabsController: NSViewController {
     var tabController: TabController!
     var windowController: WindowController!
     var onNavigationFinished: ((URL, String) -> Void)?
-    var onDownloadStart: ((URL) -> Void)?
+    var onDownload: ((URL) -> Void)?
     weak var downloadsController: DownloadsController?
 
     init(windowController: WindowController) {
@@ -37,8 +37,8 @@ final class TabsController: NSViewController {
                 self?.windowController?.rootView.tabStripView.updateTabTitle(id: id, title: title)
             }
         }
-        let parentDownloadCallback = onDownloadStart
-        webTab.onDownloadStart = { url in
+        let parentDownloadCallback = onDownload
+        webTab.onDownload = { url in
             parentDownloadCallback?(url)
         }
         webTab.downloadDelegate = downloadsController
@@ -77,8 +77,8 @@ final class TabsController: NSViewController {
                 self?.windowController?.rootView.tabStripView.updateTabTitle(id: id, title: title)
             }
         }
-        let parentDownloadCallback = onDownloadStart
-        webTab.onDownloadStart = { url in
+        let parentDownloadCallback = onDownload
+        webTab.onDownload = { url in
             parentDownloadCallback?(url)
         }
         webTab.downloadDelegate = downloadsController

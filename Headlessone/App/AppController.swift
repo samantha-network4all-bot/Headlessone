@@ -100,14 +100,14 @@ final class AppController: NSViewController {
         }
 
         // Wire download start closure
-        tabsController.onDownloadStart = { [weak self] url in
+        tabsController.onDownload = { [weak self] url in
             guard let self else { return }
             _ = self.downloadsController.start(url: url)
         }
         // Set download delegate on tabs controller level and existing webtabs
         for tabInfo in tabsController.allTabInfos() {
             if let webTab = tabsController.webTab(for: tabInfo.id) {
-                webTab.onDownloadStart = { [weak self] url in
+                webTab.onDownload = { [weak self] url in
                     guard let self else { return }
                     _ = self.downloadsController.start(url: url)
                 }

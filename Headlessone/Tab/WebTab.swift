@@ -5,7 +5,7 @@ final class WebTab: NSObject, WKNavigationDelegate {
     let webView: WKWebView
 
     var onNavigationFinished: ((URL, String) -> Void)?
-    var onDownloadStart: ((URL) -> Void)?
+    var onDownload: ((URL) -> Void)?
     var downloadDelegate: WKDownloadDelegate?
 
     private(set) var url: URL?
@@ -204,13 +204,13 @@ final class WebTab: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
         download.delegate = downloadDelegate
         guard let requestURL = download.originalRequest?.url else { return }
-        onDownloadStart?(requestURL)
+        onDownload?(requestURL)
     }
 
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         download.delegate = downloadDelegate
         if let requestURL = download.originalRequest?.url {
-            onDownloadStart?(requestURL)
+            onDownload?(requestURL)
         }
     }
 
