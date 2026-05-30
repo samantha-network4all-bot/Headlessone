@@ -36,7 +36,7 @@ final class BookmarksStore {
             return
         }
         entries = decoded
-        nextId = (entries.compactMap { Int($0.id.replacingOccurrences(of: ".b", with: "")) }.max() ?? 0) + 1
+        nextId = (entries.compactMap { Int($0.id.replacingOccurrences(of: "b", with: "")) }.max() ?? 0) + 1
     }
 
     private func save() {
@@ -46,7 +46,7 @@ final class BookmarksStore {
 
     @discardableResult
     func add(url: String, title: String) -> String {
-        let id = ".b\(nextId)"
+        let id = "b\(nextId)"
         nextId += 1
         let formatter = ISO8601DateFormatter()
         let entry = BookmarkEntry(id: id, url: url, title: title, addedAt: formatter.string(from: Date()))
@@ -60,8 +60,7 @@ final class BookmarksStore {
     }
 
     func delete(id: String) {
-        let normalized = id.hasPrefix(".") ? id : "." + id
-        entries.removeAll { $0.id == normalized }
+        entries.removeAll { $0.id == id }
         save()
     }
 
