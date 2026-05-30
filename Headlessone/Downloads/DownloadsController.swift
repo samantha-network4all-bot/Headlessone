@@ -26,10 +26,17 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
         TestAPIRouter.shared.register(controller: self)
     }
 
+    private func filenameFromURL(_ url: URL) -> String {
+        let last = url.lastPathComponent
+        if !last.isEmpty { return last }
+        if let host = url.host, !host.isEmpty { return host }
+        return "download"
+    }
+
     func start(url: URL, forcedId: String? = nil) -> (id: String, settled: Bool) {
-        let filename = url.lastPathComponent
+        let filename = filenameFromURL(url)
         let id = forcedId ?? UUID().uuidString
-        store.add(url: url.absoluteString, filename: filename)
+        store.add(id: id, url: url.absoluteString, filename: filename)
 
         // For fixture:// URLs, serve data directly from bundle for deterministic downloads
         if url.scheme == "fixture" {

@@ -43,12 +43,11 @@ final class DownloadsStore {
     }
 
     @discardableResult
-    func add(url: String, filename: String) -> String {
-        let id = UUID().uuidString
-        let entry = DownloadEntry(id: id, url: url, filename: filename, state: "running", bytesReceived: 0)
+    func add(id: String? = nil, url: String, filename: String) -> String {
+        let entry = DownloadEntry(id: id ?? UUID().uuidString, url: url, filename: filename, state: "running", bytesReceived: 0)
         entries.append(entry)
         save()
-        return id
+        return entry.id
     }
 
     func list() -> [DownloadEntry] {
