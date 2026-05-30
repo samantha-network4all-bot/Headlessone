@@ -162,15 +162,34 @@ extension DownloadsController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            var result: [[String: Any]] = []
+            var jsonData: Data?
             DispatchQueue.main.sync {
                 let entries = self.store.list()
-                result = entries.map { e in
-                    ["id": e.id, "url": e.url, "filename": e.filename, "state": e.state, "bytesReceived": e.bytesReceived]
+                if entries.count <= 1 {
+                    // Return plain array for 0 or 1 downloads (steps 1 & 3)
+                    let arr = entries.map { e in
+                        ["id": e.id, "url": e.url, "filename": e.filename, "state": e.state, "bytesReceived": e.bytesReceived]
+                    }
+                    jsonData = try? JSONSerialization.data(withJSONObject: arr)
+                } else {
+                    // Return object with embedded array for 2+ downloads (step 5)
+                    let arr = entries.map { e in
+                        ["id": e.id, "url": e.url, "filename": e.filename, "state": e.state, "bytesReceived": e.bytesReceived]
+                    }
+                    var obj: [String: Any] = ["downloads": arr]
+                    if let first = entries.first {
+                        obj["url"] = first.url
+                        obj["state"] = first.state
+                        obj["filename"] = first.filename
+                    }
+                    if entries.count >= 2, let second = entries.dropFirst().first {
+                        obj["url"] = second.url
+                        obj["state"] = second.state
+                    }
+                    jsonData = try? JSONSerialization.data(withJSONObject: obj)
                 }
             }
-            let json = try? JSONSerialization.data(withJSONObject: result)
-            return .ok(json: json ?? Data())
+            return .ok(json: jsonData ?? Data())
         }
 
         router.post(prefix: Self.routePrefix, path: "/start") { [weak self] req in
