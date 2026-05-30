@@ -32,9 +32,11 @@ final class BookmarksStore {
         guard let data = try? Data(contentsOf: fileURL),
               let decoded = try? JSONDecoder().decode([BookmarkEntry].self, from: data) else {
             entries = []
+            nextId = 1
             return
         }
         entries = decoded
+        nextId = (entries.compactMap { Int($0.id.dropFirst()) }.max() ?? 0) + 1
     }
 
     private func save() {
