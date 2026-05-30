@@ -287,7 +287,9 @@ extension DownloadsController: TestAPIControllerRoutes {
             }
             let forcedId = b.id
             let (id, _) = self.start(url: url, forcedId: forcedId)
-            let json = try! JSONSerialization.data(withJSONObject: ["ok": true, "id": id])
+            struct StartResponse: Codable { let ok: Bool; let id: String }
+            let response = StartResponse(ok: true, id: id)
+            let json = try! JSONEncoder().encode(response)
             return .ok(json: json)
         }
 
