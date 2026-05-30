@@ -185,7 +185,9 @@ extension DownloadsController: TestAPIControllerRoutes {
             let id = DispatchQueue.main.sync { self.start(url: url) }
             struct StartResponse: Codable { let ok: Bool; let id: String }
             let response = StartResponse(ok: true, id: id)
-            let json = try! JSONEncoder().encode(response)
+            guard let json = try? JSONEncoder().encode(response) else {
+                return .serverError("encode failed")
+            }
             return .ok(json: json)
         }
 
