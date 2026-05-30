@@ -149,12 +149,7 @@ final class WebTab: NSObject, WKNavigationDelegate {
         canGoForward = webView.canGoForward
         navigationFinished = true
         if let u = url {
-            // Defer recording so the title KVO has time to fire.
-            let capturedTitle = title
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.onNavigationFinished?(u, self.title)
-            }
+            self.onNavigationFinished?(u, title)
         }
     }
 
