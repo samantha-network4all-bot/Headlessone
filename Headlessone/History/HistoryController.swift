@@ -26,28 +26,22 @@ extension HistoryController: TestAPIControllerRoutes {
     func registerRoutes(on router: TestAPIRouter) {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] _ in
             guard let self else { return .notFound() }
-            var result: HistoryEntry?
+            var result: [HistoryEntry] = []
             DispatchQueue.main.sync {
-                result = self.store.list().first
+                result = self.store.list()
             }
-            guard let item = result else {
-                return .ok(json: Data("{}".utf8))
-            }
-            let json = try? JSONEncoder().encode(item)
+            let json = try? JSONEncoder().encode(result)
             return .ok(json: json ?? Data())
         }
 
         router.get(prefix: Self.routePrefix, path: "/search") { [weak self] req in
             guard let self else { return .notFound() }
             let q = req.query["q"] ?? ""
-            var result: HistoryEntry?
+            var result: [HistoryEntry] = []
             DispatchQueue.main.sync {
-                result = self.store.search(q: q).first
+                result = self.store.search(q: q)
             }
-            guard let item = result else {
-                return .ok(json: Data("{}".utf8))
-            }
-            let json = try? JSONEncoder().encode(item)
+            let json = try? JSONEncoder().encode(result)
             return .ok(json: json ?? Data())
         }
 
