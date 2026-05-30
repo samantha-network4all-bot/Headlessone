@@ -36,7 +36,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
     func start(url: URL, forcedId: String? = nil) -> (id: String, settled: Bool) {
         let filename = filenameFromURL(url)
         let id = forcedId ?? UUID().uuidString
-        store.add(id: id, url: url.absoluteString, filename: filename)
 
         // For fixture:// URLs, serve data directly from bundle for deterministic downloads
         if url.scheme == "fixture" {
@@ -44,14 +43,21 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
             let tmpDir = FileManager.default.temporaryDirectory
             let dest = tmpDir.appendingPathComponent(filename)
             try? FileManager.default.removeItem(at: dest)
+            var finalState = "failed"
+            var finalBytes = 0
             if let data = data, !data.isEmpty {
                 try? data.write(to: dest)
-                store.update(id: id, state: "finished", bytesReceived: data.count)
-            } else {
-                store.update(id: id, state: "failed", bytesReceived: 0)
+                finalState = "finished"
+                finalBytes = data.count
+            }
+            DispatchQueue.main.sync {
+                self.store.add(id: id, url: url.absoluteString, filename: filename)
+                self.store.update(id: id, state: finalState, bytesReceived: finalBytes)
             }
             return (id: id, settled: true)
         }
+
+        store.add(id: id, url: url.absoluteString, filename: filename)
 
         let sem = DispatchSemaphore(value: 0)
         lock.lock()
