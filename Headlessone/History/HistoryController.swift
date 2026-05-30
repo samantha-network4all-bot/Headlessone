@@ -30,14 +30,10 @@ extension HistoryController: TestAPIControllerRoutes {
             DispatchQueue.main.sync {
                 result = self.store.list()
             }
-            var response: [String: Any] = ["entries": result.map { e in
+            let items = result.map { e in
                 ["url": e.url, "title": e.title, "visitedAt": e.visitedAt]
-            }]
-            if let first = result.first {
-                response["url"] = first.url
-                response["title"] = first.title
             }
-            let json = try? JSONSerialization.data(withJSONObject: response)
+            let json = try? JSONSerialization.data(withJSONObject: items)
             return .ok(json: json ?? Data())
         }
 
@@ -48,14 +44,10 @@ extension HistoryController: TestAPIControllerRoutes {
             DispatchQueue.main.sync {
                 result = self.store.search(q: q)
             }
-            var response: [String: Any] = ["entries": result.map { e in
+            let items = result.map { e in
                 ["url": e.url, "title": e.title, "visitedAt": e.visitedAt]
-            }]
-            if let first = result.first {
-                response["url"] = first.url
-                response["title"] = first.title
             }
-            let json = try? JSONSerialization.data(withJSONObject: response)
+            let json = try? JSONSerialization.data(withJSONObject: items)
             return .ok(json: json ?? Data())
         }
 
