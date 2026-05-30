@@ -4,6 +4,8 @@ final class WebTab: NSObject, WKNavigationDelegate {
     let id: String
     let webView: WKWebView
 
+    var onNavigationFinished: ((URL, String) -> Void)?
+
     private(set) var url: URL?
     private(set) var title: String = "New Tab"
     internal(set) var loadState: String = "idle"
@@ -146,6 +148,9 @@ final class WebTab: NSObject, WKNavigationDelegate {
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
         navigationFinished = true
+        if let u = url {
+            onNavigationFinished?(u, title)
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

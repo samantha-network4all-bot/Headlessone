@@ -6,6 +6,7 @@ final class TabsController: NSViewController {
     private var webTabs: [String: WebTab] = [:]
     var tabController: TabController!
     var windowController: WindowController!
+    var onNavigationFinished: ((URL, String) -> Void)?
 
     init(windowController: WindowController) {
         self.windowController = windowController
@@ -27,6 +28,7 @@ final class TabsController: NSViewController {
         // Create initial tab
         let id = state.newTabId()
         let webTab = WebTab(id: id, configuration: WebConfig.shared.configuration)
+        webTab.onNavigationFinished = onNavigationFinished
         webTabs[id] = webTab
         state.addTab(id: id, url: "fixture://newtab", title: "New Tab", activate: true)
 
@@ -54,6 +56,7 @@ final class TabsController: NSViewController {
     func newTab(url: String = "fixture://newtab") -> String {
         let id = state.newTabId()
         let webTab = WebTab(id: id, configuration: WebConfig.shared.configuration)
+        webTab.onNavigationFinished = onNavigationFinished
         webTabs[id] = webTab
         state.addTab(id: id, url: url, title: "New Tab", activate: true)
         windowController.rootView.tabStripView.addTabButton(id: id, title: "New Tab", active: true)

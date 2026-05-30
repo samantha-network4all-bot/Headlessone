@@ -31,6 +31,17 @@ final class MenuBuilder {
         viewMenu.addItem(NSMenuItem.separator())
         viewMenu.addItem(NSMenuItem(title: "Find…", action: #selector(AppController.find(_:)), keyEquivalent: "f"))
 
+        // History menu
+        let historyMenuItem = NSMenuItem()
+        mainMenu.addItem(historyMenuItem)
+        let historyMenu = NSMenu(title: "History")
+        historyMenuItem.submenu = historyMenu
+        historyMenu.addItem(NSMenuItem(title: "Back", action: #selector(AppController.goBack(_:)), keyEquivalent: "["))
+        historyMenu.addItem(NSMenuItem(title: "Forward", action: #selector(AppController.goForward(_:)), keyEquivalent: "]"))
+        historyMenu.addItem(NSMenuItem.separator())
+        historyMenu.addItem(NSMenuItem(title: "Show History", action: #selector(AppController.showHistory(_:)), keyEquivalent: ""))
+        historyMenu.addItem(NSMenuItem(title: "Clear History", action: #selector(AppController.clearHistory(_:)), keyEquivalent: ""))
+
         NSApp.mainMenu = mainMenu
     }
 }
@@ -61,6 +72,28 @@ extension AppController {
     @objc func find(_ sender: Any?) {
         DispatchQueue.main.async { [weak self] in
             self?.findController?.toggleFindBar()
+        }
+    }
+
+    @objc func goBack(_ sender: Any?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.tabsController.tabController.goBack()
+        }
+    }
+
+    @objc func goForward(_ sender: Any?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.tabsController.tabController.goForward()
+        }
+    }
+
+    @objc func showHistory(_ sender: Any?) {
+        // Placeholder — no panel required for this slice
+    }
+
+    @objc func clearHistory(_ sender: Any?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.historyController.store.clear()
         }
     }
 }

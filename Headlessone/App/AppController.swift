@@ -6,6 +6,7 @@ final class AppController: NSViewController {
     var tabsController: TabsController!
     var omniboxController: OmniboxController!
     var findController: FindController!
+    var historyController: HistoryController!
     private var testAPIServer: TestAPIServer?
 
     init() {
@@ -66,6 +67,24 @@ final class AppController: NSViewController {
         findController = FindController()
         findController.tabsController = tabsController
         _ = findController.view // triggers viewDidLoad so /find/* routes register
+
+        // Create history controller
+        historyController = HistoryController()
+        historyController.tabsController = tabsController
+        _ = historyController.view // triggers viewDidLoad so /history/* routes register
+
+        // Wire history recording onto all current and future tabs
+        let historyCallback: (URL, String) -> Void = { [weak self] url, title in
+            guard let self else { return }
+            self.historyController.store.record(url: url.absoluteString, title: title)
+        }
+        tabsController.onNavigationFinished = historyCallback
+        // Wire onto any existing WebTabs already created by TabsController.init
+        for tabInfo in tabsController.allTabInfos() {
+            if let webTab = tabsController.webTab(for: tabInfo.id) {
+                webTab.onNavigationFinished = historyCallback
+            }
+        }
 
         // Register routes (top-level orchestrator routes)
         TestAPIRouter.shared.register(controller: self)
