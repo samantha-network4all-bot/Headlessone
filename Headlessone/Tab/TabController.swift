@@ -23,6 +23,30 @@ final class TabController: NSViewController {
     func activeWebTab() -> WebTab? {
         return tabsController.activeWebTab
     }
+
+    func goBack() {
+        DispatchQueue.main.sync {
+            self.activeWebTab()?.goBackSynchronously()
+        }
+    }
+
+    func goForward() {
+        DispatchQueue.main.sync {
+            self.activeWebTab()?.goForwardSynchronously()
+        }
+    }
+
+    func reload() {
+        DispatchQueue.main.sync {
+            self.activeWebTab()?.reloadSynchronously()
+        }
+    }
+
+    func stop() {
+        DispatchQueue.main.sync {
+            self.activeWebTab()?.webView.stopLoading()
+        }
+    }
 }
 
 extension TabController: TestAPIControllerRoutes {
