@@ -11,7 +11,6 @@ struct BookmarkEntry: Codable, Equatable {
 final class BookmarksStore {
     private let fileURL: URL
     private var entries: [BookmarkEntry] = []
-    private var nextId: Int = 1
 
     init() {
         let isTest = ProcessInfo.processInfo.environment["HEADLESSONE_TEST_API"] == "1"
@@ -33,11 +32,9 @@ final class BookmarksStore {
         guard let data = try? Data(contentsOf: fileURL),
               let decoded = try? JSONDecoder().decode([BookmarkEntry].self, from: data) else {
             entries = []
-            nextId = 1
             return
         }
         entries = decoded
-        nextId = (entries.compactMap { Int($0.id.dropFirst()) }.max() ?? 0) + 1
     }
 
     private func save() {
@@ -47,8 +44,7 @@ final class BookmarksStore {
 
     @discardableResult
     func add(url: String, title: String) -> String {
-        let id = "b\(nextId)"
-        nextId += 1
+        let id = UUID().uuidString
         let formatter = ISO8601DateFormatter()
         let entry = BookmarkEntry(id: id, url: url, title: title, addedAt: formatter.string(from: Date()))
         entries.append(entry)
