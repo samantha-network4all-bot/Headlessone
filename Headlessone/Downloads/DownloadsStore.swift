@@ -70,4 +70,22 @@ final class DownloadsStore {
         entries = []
         save()
     }
+
+    func filename(for id: String) -> String? {
+        for e in entries {
+            if e.id == id {
+                return e.filename
+            }
+        }
+        return nil
+    }
+
+    func bytesReceived(for id: String) -> Int {
+        for e in entries {
+            if e.id == id {
+                return e.bytesReceived
+            }
+        }
+        return 0
+    }
 }
