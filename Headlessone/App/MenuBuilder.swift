@@ -106,7 +106,12 @@ extension AppController {
     }
 
     @objc func addBookmark(_ sender: Any?) {
-        // Placeholder — will use active tab URL/title via BookmarksController
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let webTab = self.tabsController.activeWebTab else { return }
+            let url = webTab.url?.absoluteString ?? ""
+            let title = webTab.title
+            self.bookmarksController.store.add(url: url, title: title)
+        }
     }
 
     @objc func showBookmarks(_ sender: Any?) {

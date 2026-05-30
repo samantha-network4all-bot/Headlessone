@@ -10,6 +10,7 @@ struct BookmarkEntry: Codable, Equatable {
 final class BookmarksStore {
     private let fileURL: URL
     private var entries: [BookmarkEntry] = []
+    private var nextId: Int = 1
 
     init() {
         let isTest = ProcessInfo.processInfo.environment["HEADLESSONE_TEST_API"] == "1"
@@ -43,7 +44,8 @@ final class BookmarksStore {
 
     @discardableResult
     func add(url: String, title: String) -> String {
-        let id = "b\(UUID().uuidString.prefix(8))"
+        let id = "b\(nextId)"
+        nextId += 1
         let formatter = ISO8601DateFormatter()
         let entry = BookmarkEntry(id: id, url: url, title: title, addedAt: formatter.string(from: Date()))
         entries.append(entry)
