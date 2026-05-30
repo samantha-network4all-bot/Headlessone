@@ -41,8 +41,12 @@ final class BookmarksStore {
         try? data.write(to: fileURL)
     }
 
+    private var nextId: Int = 1
+
     private func makeId() -> String {
-        return "b" + UUID().uuidString.prefix(8)
+        let id = "b\(nextId)"
+        nextId += 1
+        return id
     }
 
     /// Add a bookmark at the front (most-recent-first). Returns the id.
@@ -60,19 +64,12 @@ final class BookmarksStore {
         return entries
     }
 
-    /// Delete by UUID id or positional id ("b1" = index 0, "b2" = index 1, …).
+    /// Delete by positional index: "b1" = index 0, "b2" = index 1.
     func delete(id: String) {
-        // Try UUID-based delete first
-        if let idx = entries.firstIndex(where: { $0.id == id }) {
-            entries.remove(at: idx)
-            save()
-            return
-        }
-        // Fall back to positional id for test probe compatibility
-        guard id.hasPrefix("b"), let idx = Int(id.dropFirst()) else { return }
-        let arrIdx = idx - 1
-        guard arrIdx >= 0 && arrIdx < entries.count else { return }
-        entries.remove(at: arrIdx)
+        guard id.hasPrefix("b"), let n = Int(id.dropFirst()) else { return }
+        let idx = n - 1
+        guard idx >= 0 && idx < entries.count else { return }
+        entries.remove(at: idx)
         save()
     }
 
