@@ -72,16 +72,16 @@ final class OmniboxController: NSViewController {
     private func resolveAndNavigate(text: String) -> String {
         let url = resolveURL(from: text)
         guard let targetURL = URL(string: url) else {
+            self.state.text = url
             DispatchQueue.main.sync {
-                self.state.text = url
                 self.omniboxView.stringValue = url
             }
             return url
         }
+        self.tabsController?.activeWebTab?.navigateSynchronously(url: targetURL)
+        self.state.text = url
         DispatchQueue.main.sync {
-            self.state.text = url
             self.omniboxView.stringValue = url
-            self.tabsController?.activeWebTab?.navigateSynchronously(url: targetURL)
         }
         return url
     }
@@ -105,10 +105,7 @@ extension OmniboxController: TestAPIControllerRoutes {
 
         router.get(prefix: Self.routePrefix, path: "/state") { [weak self] _ in
             guard let self else { return .notFound() }
-            var text = ""
-            DispatchQueue.main.sync {
-                text = self.state.text
-            }
+            let text = self.state.text
             let body = try? JSONEncoder().encode(["text": text])
             return .ok(json: body ?? Data())
         }
