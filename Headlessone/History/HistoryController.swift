@@ -33,13 +33,7 @@ extension HistoryController: TestAPIControllerRoutes {
             let items = result.map { e in
                 ["url": e.url, "title": e.title, "visitedAt": e.visitedAt]
             }
-            var response: [String: Any] = ["entries": items]
-            if let first = result.first {
-                response["url"] = first.url
-                response["title"] = first.title
-                response["visitedAt"] = first.visitedAt
-            }
-            let json = try? JSONSerialization.data(withJSONObject: response)
+            let json = try? JSONSerialization.data(withJSONObject: items)
             return .ok(json: json ?? Data())
         }
 
@@ -53,13 +47,7 @@ extension HistoryController: TestAPIControllerRoutes {
             let items = result.map { e in
                 ["url": e.url, "title": e.title, "visitedAt": e.visitedAt]
             }
-            var response: [String: Any] = ["entries": items]
-            if let first = result.first {
-                response["url"] = first.url
-                response["title"] = first.title
-                response["visitedAt"] = first.visitedAt
-            }
-            let json = try? JSONSerialization.data(withJSONObject: response)
+            let json = try? JSONSerialization.data(withJSONObject: items)
             return .ok(json: json ?? Data())
         }
 
