@@ -192,10 +192,26 @@ final class WebTab: NSObject, WKNavigationDelegate {
         decisionHandler(.allow)
     }
 
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        let mimeType = navigationResponse.response.mimeType ?? ""
+        if navigationResponse.isForMainFrame && mimeType == "application/octet-stream" {
+            decisionHandler(.download)
+            return
+        }
+        decisionHandler(.allow)
+    }
+
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
         download.delegate = downloadDelegate
         guard let requestURL = download.originalRequest?.url else { return }
         onDownloadStart?(requestURL)
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        download.delegate = downloadDelegate
+        if let requestURL = download.originalRequest?.url {
+            onDownloadStart?(requestURL)
+        }
     }
 
 }

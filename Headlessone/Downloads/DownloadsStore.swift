@@ -10,7 +10,7 @@ struct DownloadEntry: Codable, Equatable {
 
 final class DownloadsStore {
     private var entries: [DownloadEntry] = []
-    private var nextId: Int = 0
+    private var nextId: Int = 1
 
     @discardableResult
     func add(url: String, filename: String) -> String {
