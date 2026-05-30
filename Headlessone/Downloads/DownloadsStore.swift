@@ -11,6 +11,7 @@ struct DownloadEntry: Codable, Equatable {
 final class DownloadsStore {
     private let fileURL: URL
     private var entries: [DownloadEntry] = []
+    private var nextId: Int = 0
 
     init() {
         let isTest = ProcessInfo.processInfo.environment["HEADLESSONE_TEST_API"] == "1"
@@ -32,9 +33,17 @@ final class DownloadsStore {
         guard let data = try? Data(contentsOf: fileURL),
               let decoded = try? JSONDecoder().decode([DownloadEntry].self, from: data) else {
             entries = []
+            nextId = 0
             return
         }
         entries = decoded
+        nextId = (entries.compactMap { extractNumericId(from: $0.id) }.max() ?? -1) + 1
+    }
+
+    private func extractNumericId(from id: String) -> Int? {
+        // Supports ".d5", "d5", or plain "5" formats
+        let numericPart = id.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)
+        return Int(numericPart)
     }
 
     private func save() {
@@ -44,7 +53,18 @@ final class DownloadsStore {
 
     @discardableResult
     func add(id: String? = nil, url: String, filename: String) -> String {
-        let entry = DownloadEntry(id: id ?? UUID().uuidString, url: url, filename: filename, state: "running", bytesReceived: 0)
+        let effectiveId: String
+        if let provided = id, !provided.isEmpty {
+            effectiveId = provided
+            // Advance nextId if the provided id has a numeric component
+            if let n = extractNumericId(from: provided), n >= nextId {
+                nextId = n + 1
+            }
+        } else {
+            effectiveId = ".d\(nextId)"
+            nextId += 1
+        }
+        let entry = DownloadEntry(id: effectiveId, url: url, filename: filename, state: "running", bytesReceived: 0)
         entries.append(entry)
         save()
         return entry.id
@@ -67,6 +87,7 @@ final class DownloadsStore {
 
     func clear() {
         entries = []
+        nextId = 0
         save()
     }
 

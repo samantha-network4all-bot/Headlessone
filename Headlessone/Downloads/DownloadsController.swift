@@ -35,7 +35,6 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
 
     func start(url: URL, forcedId: String? = nil) -> (id: String, settled: Bool) {
         let filename = filenameFromURL(url)
-        let id = forcedId ?? UUID().uuidString
 
         // For fixture:// URLs, serve data directly from bundle for deterministic downloads
         if url.scheme == "fixture" {
@@ -50,20 +49,28 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
                 finalState = "finished"
                 finalBytes = data.count
             }
+            let id = DispatchQueue.main.sync { [weak self] () -> String in
+                guard let self else { return forcedId ?? ".d0" }
+                return self.store.add(id: forcedId, url: url.absoluteString, filename: filename)
+            }
             DispatchQueue.main.sync {
-                self.store.add(id: id, url: url.absoluteString, filename: filename)
                 self.store.update(id: id, state: finalState, bytesReceived: finalBytes)
             }
             return (id: id, settled: true)
         }
 
-        store.add(id: id, url: url.absoluteString, filename: filename)
+        // For non-fixture urls, create the store entry first to get a stable id,
+        // then start the WKDownload asynchronously
+        var storeId = ""
+        DispatchQueue.main.sync {
+            storeId = self.store.add(id: forcedId, url: url.absoluteString, filename: filename)
+        }
 
         let sem = DispatchSemaphore(value: 0)
         lock.lock()
-        downloadSemaphores[id] = sem
-        lastBytesWritten[id] = 0
-        downloadFilenames[id] = filename
+        downloadSemaphores[storeId] = sem
+        lastBytesWritten[storeId] = 0
+        downloadFilenames[storeId] = filename
         lock.unlock()
 
         DispatchQueue.main.async { [weak self] in
@@ -72,10 +79,10 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
                 return
             }
             guard let webTab = self.tabsController?.activeWebTab else {
-                self.store.update(id: id, state: "failed", bytesReceived: 0)
+                self.store.update(id: storeId, state: "failed", bytesReceived: 0)
                 self.lock.lock()
-                self.lastBytesWritten.removeValue(forKey: id)
-                self.downloadFilenames.removeValue(forKey: id)
+                self.lastBytesWritten.removeValue(forKey: storeId)
+                self.downloadFilenames.removeValue(forKey: storeId)
                 self.lock.unlock()
                 sem.signal()
                 return
@@ -86,13 +93,13 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
                     let download = try await webTab.webView.startDownload(using: request)
                     download.delegate = self
                     self.lock.lock()
-                    self.activeDownloads[id] = download
+                    self.activeDownloads[storeId] = download
                     self.lock.unlock()
                 } catch {
-                    self.store.update(id: id, state: "failed", bytesReceived: 0)
+                    self.store.update(id: storeId, state: "failed", bytesReceived: 0)
                     self.lock.lock()
-                    self.lastBytesWritten.removeValue(forKey: id)
-                    self.downloadFilenames.removeValue(forKey: id)
+                    self.lastBytesWritten.removeValue(forKey: storeId)
+                    self.downloadFilenames.removeValue(forKey: storeId)
                     self.lock.unlock()
                     sem.signal()
                 }
@@ -100,7 +107,7 @@ final class DownloadsController: NSViewController, WKDownloadDelegate {
         }
 
         let result = sem.wait(timeout: .now() + 15.0)
-        return (id: id, settled: result == .success)
+        return (id: storeId, settled: result == .success)
     }
 
     private func loadFixtureData(url: URL) -> Data? {
