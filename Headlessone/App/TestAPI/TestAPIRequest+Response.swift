@@ -36,7 +36,7 @@ struct TestAPIResponse {
     static func badRequest(_ message: String) -> TestAPIResponse {
         var r = TestAPIResponse()
         r.status = 400
-        r.body = Data("{\"error\":\"\\(message)\"}\n".utf8)
+        r.body = Data("{\"error\":\"\(message)\"}\n".utf8)
         return r
     }
 

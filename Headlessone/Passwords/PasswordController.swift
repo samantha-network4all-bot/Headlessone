@@ -109,7 +109,13 @@ extension PasswordController: TestAPIControllerRoutes {
             guard let password = self.vault.get(origin: origin, username: username) else {
                 return .notFound()
             }
-            let json = Data("{\"password\": \"\(password)\"}\n".utf8)
+            struct Response: Codable { let password: String }
+            let resp = Response(password: password)
+            guard let data = try? JSONEncoder().encode(resp) else {
+                return .serverError("encoding failed")
+            }
+            var json = data
+            json.append(Data("\n".utf8))
             return .ok(json: json)
         }
     }
