@@ -64,7 +64,7 @@ extension PasswordController: TestAPIControllerRoutes {
                 return .badRequest("body must be {\"origin\":..., \"username\":..., \"password\":...}")
             }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                return .ok(json: Data("{\"error\":\"vault is locked\"}\n".utf8))
             }
             self.vault.save(origin: b.origin, username: b.username, password: b.password)
             return .ok(json: Data("{\"ok\":true}\n".utf8))
@@ -73,7 +73,7 @@ extension PasswordController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                return .ok(json: Data("{\"error\":\"vault is locked\"}\n".utf8))
             }
             let origin = req.query["origin"]
             let items = self.vault.list(origin: origin)
@@ -100,7 +100,7 @@ extension PasswordController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/get") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                return .ok(json: Data("{\"error\":\"vault is locked\"}\n".utf8))
             }
             guard let origin = req.query["origin"], let username = req.query["username"] else {
                 return .badRequest("required query params: origin, username")
