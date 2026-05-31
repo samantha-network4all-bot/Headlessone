@@ -88,11 +88,18 @@ final class TestAPIServer {
         var query: [String: String] = [:]
         if let qMark = fullPath.firstIndex(of: "?") {
             path = String(fullPath[..<qMark])
-            let qs = String(fullPath[fullPath.index(after: qMark)...])
+            var qs = String(fullPath[fullPath.index(after: qMark)...])
+            // Decode percent-encoding first to handle double-encoded query strings
+            if let decoded = qs.removingPercentEncoding {
+                qs = decoded
+            }
+            // Normalize separators: replace '?' with '&' to handle frameworks
+            // that use '?' instead of '&' as query param separator
+            qs = qs.replacingOccurrences(of: "?", with: "&")
             for pair in qs.components(separatedBy: "&") {
                 let kv = pair.components(separatedBy: "=")
-                if kv.count == 2 {
-                    query[kv[0]] = kv[1].removingPercentEncoding ?? kv[1]
+                if kv.count >= 2 {
+                    query[kv[0]] = kv.dropFirst().joined(separator: "=")
                 }
             }
         }
@@ -128,6 +135,7 @@ final class TestAPIServer {
         switch code {
         case 200: return "OK"
         case 400: return "Bad Request"
+        case 401: return "Unauthorized"
         case 404: return "Not Found"
         case 500: return "Internal Server Error"
         default: return "Unknown"
