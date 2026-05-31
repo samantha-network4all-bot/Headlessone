@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import CryptoKit
 import CommonCrypto
+import WebKit
 
 final class PasswordController: NSViewController {
     let vault = Vault()
@@ -70,7 +71,10 @@ extension PasswordController: TestAPIControllerRoutes {
                 return .badRequest("body must be {\"origin\":..., \"username\":..., \"password\":...}")
             }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
             self.vault.save(origin: b.origin, username: b.username, password: b.password)
             return .ok(json: Data("{\"ok\":true}\n".utf8))
@@ -80,7 +84,10 @@ extension PasswordController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
             let origin = req.query["origin"]
             let items = self.vault.list(origin: origin)
@@ -99,7 +106,10 @@ extension PasswordController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/get") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
             let origin = req.query["origin"]
             let username = req.query["username"]
@@ -125,7 +135,10 @@ extension PasswordController: TestAPIControllerRoutes {
                 return .badRequest("body must be {\"origin\": String, \"username\": String}")
             }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
             self.vault.delete(origin: b.origin, username: b.username)
             return .ok(json: Data("{\"ok\":true}\n".utf8))
@@ -135,7 +148,10 @@ extension PasswordController: TestAPIControllerRoutes {
         router.post(prefix: Self.routePrefix, path: "/autofill") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
-                return .unauthorized("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
 
             var filled = false
@@ -148,6 +164,10 @@ extension PasswordController: TestAPIControllerRoutes {
                     targetTabId = id
                 }
             }
+
+            // Collect data on main thread without blocking it, then async execute JS
+            var jsToExecute: String?
+            var targetWebView: WKWebView?
 
             DispatchQueue.main.sync {
                 var webTab: WebTab?
@@ -167,22 +187,32 @@ extension PasswordController: TestAPIControllerRoutes {
                       let username = first["username"],
                       let password = self.vault.get(origin: origin, username: username) else { return }
 
-                let js = Autofill.jsFor(origin: origin, username: username, password: password)
-                let sem = DispatchSemaphore(value: 0)
-                tab.webView.evaluateJavaScript(js) { result, _ in
+                jsToExecute = Autofill.jsFor(origin: origin, username: username, password: password)
+                targetWebView = tab.webView
+            }
+
+            guard let js = jsToExecute, let webView = targetWebView else {
+                let respDict: [String: Any] = ["ok": true, "filled": false]
+                let bodyData = (try? JSONSerialization.data(withJSONObject: respDict)) ?? Data()
+                return .ok(json: bodyData)
+            }
+
+            // Execute JS async and wait with semaphore on the background thread
+            let sem = DispatchSemaphore(value: 0)
+            DispatchQueue.main.async {
+                webView.evaluateJavaScript(js) { result, _ in
                     if let val = result as? Bool {
                         filled = val
                     }
                     sem.signal()
                 }
-                _ = sem.wait(timeout: .now() + 10)
             }
 
-            let response: [String: Any] = ["ok": true, "filled": filled]
-            let bodyData = (try? JSONSerialization.data(withJSONObject: response)) ?? Data()
+            _ = sem.wait(timeout: .now() + 10)
+
+            let respDict: [String: Any] = ["ok": true, "filled": filled]
+            let bodyData = (try? JSONSerialization.data(withJSONObject: respDict)) ?? Data()
             return .ok(json: bodyData)
         }
     }
 }
-
-
