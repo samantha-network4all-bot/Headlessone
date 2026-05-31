@@ -19,6 +19,13 @@ struct TestAPIResponse {
         return r
     }
 
+    static func unauthorized(_ message: String) -> TestAPIResponse {
+        var r = TestAPIResponse()
+        r.status = 401
+        r.body = Data("{\"error\":\"\(message)\"}\n".utf8)
+        return r
+    }
+
     static func notFound(_ req: TestAPIRequest) -> TestAPIResponse {
         var r = TestAPIResponse()
         r.status = 404
