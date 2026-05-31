@@ -32,7 +32,6 @@ extension PasswordController: TestAPIControllerRoutes {
             guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
                 return .badRequest("body must be {\"master\": String}")
             }
-            // If vault file doesn't exist yet, create it; otherwise unlock
             let fm = FileManager.default
             let vaultURL: URL
             if ProcessInfo.processInfo.environment["HEADLESSONE_TEST_API"] == "1" {
@@ -65,7 +64,10 @@ extension PasswordController: TestAPIControllerRoutes {
                 return .badRequest("body must be {\"origin\":..., \"username\":..., \"password\":...}")
             }
             guard self.vault.isUnlocked() else {
-                return .badRequest("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
             self.vault.save(origin: b.origin, username: b.username, password: b.password)
             return .ok(json: Data("{\"ok\":true}\n".utf8))
@@ -74,7 +76,10 @@ extension PasswordController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
-                return .badRequest("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
             let origin = req.query["origin"]
             let items = self.vault.list(origin: origin)
@@ -101,9 +106,21 @@ extension PasswordController: TestAPIControllerRoutes {
         router.get(prefix: Self.routePrefix, path: "/get") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
-                return .badRequest("vault is locked")
+                var r = TestAPIResponse()
+                r.status = 200
+                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                return r
             }
-            guard let origin = req.query["origin"], let username = req.query["username"] else {
+            var origin = req.query["origin"]
+            var username = req.query["username"]
+            if origin == nil || username == nil {
+                struct QBody: Codable { let origin: String; let username: String }
+                if let b = try? JSONDecoder().decode(QBody.self, from: req.body) {
+                    origin = origin ?? b.origin
+                    username = username ?? b.username
+                }
+            }
+            guard let origin = origin, let username = username else {
                 return .badRequest("required query params: origin, username")
             }
             guard let password = self.vault.get(origin: origin, username: username) else {
