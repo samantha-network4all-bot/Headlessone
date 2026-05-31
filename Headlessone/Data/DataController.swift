@@ -43,10 +43,11 @@ extension DataController: TestAPIControllerRoutes {
             if types.contains("cookies") || types.contains("all") {
                 let sem = DispatchSemaphore(value: 0)
                 DispatchQueue.main.sync {
-                    self.websiteDataStore.fetchDataRecords(ofTypes: [WKWebsiteDataTypeCookies]) { records in
-                        self.websiteDataStore.removeData(ofTypes: [WKWebsiteDataTypeCookies], for: records) {
-                            sem.signal()
-                        }
+                    self.websiteDataStore.removeData(
+                        ofTypes: [WKWebsiteDataTypeCookies],
+                        modifiedSince: Date.distantPast
+                    ) {
+                        sem.signal()
                     }
                 }
                 _ = sem.wait(timeout: .now() + 5)
@@ -55,10 +56,11 @@ extension DataController: TestAPIControllerRoutes {
             if types.contains("cache") || types.contains("all") {
                 let sem = DispatchSemaphore(value: 0)
                 DispatchQueue.main.sync {
-                    self.websiteDataStore.fetchDataRecords(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache]) { records in
-                        self.websiteDataStore.removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], for: records) {
-                            sem.signal()
-                        }
+                    self.websiteDataStore.removeData(
+                        ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache],
+                        modifiedSince: Date.distantPast
+                    ) {
+                        sem.signal()
                     }
                 }
                 _ = sem.wait(timeout: .now() + 5)
