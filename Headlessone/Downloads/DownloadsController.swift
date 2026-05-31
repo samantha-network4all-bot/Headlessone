@@ -165,29 +165,10 @@ extension DownloadsController: TestAPIControllerRoutes {
             var jsonData: Data?
             DispatchQueue.main.sync {
                 let entries = self.store.list()
-                if entries.count <= 1 {
-                    // Return plain array for 0 or 1 downloads (steps 1 & 3)
-                    let arr = entries.map { e in
-                        ["id": e.id, "url": e.url, "filename": e.filename, "state": e.state, "bytesReceived": e.bytesReceived]
-                    }
-                    jsonData = try? JSONSerialization.data(withJSONObject: arr)
-                } else {
-                    // Return object with embedded array for 2+ downloads (step 5)
-                    let arr = entries.map { e in
-                        ["id": e.id, "url": e.url, "filename": e.filename, "state": e.state, "bytesReceived": e.bytesReceived]
-                    }
-                    var obj: [String: Any] = ["downloads": arr]
-                    if let first = entries.first {
-                        obj["url"] = first.url
-                        obj["state"] = first.state
-                        obj["filename"] = first.filename
-                    }
-                    if entries.count >= 2, let second = entries.dropFirst().first {
-                        obj["url"] = second.url
-                        obj["state"] = second.state
-                    }
-                    jsonData = try? JSONSerialization.data(withJSONObject: obj)
+                let arr = entries.map { e in
+                    ["id": e.id, "url": e.url, "filename": e.filename, "state": e.state, "bytesReceived": e.bytesReceived]
                 }
+                jsonData = try? JSONSerialization.data(withJSONObject: arr)
             }
             return .ok(json: jsonData ?? Data())
         }
@@ -201,13 +182,9 @@ extension DownloadsController: TestAPIControllerRoutes {
             guard let url = URL(string: b.url) else {
                 return .badRequest("invalid URL")
             }
-            let id = DispatchQueue.main.sync { self.start(url: url) }
-            struct StartResponse: Codable { let ok: Bool; let id: String }
-            let response = StartResponse(ok: true, id: id)
-            guard let json = try? JSONEncoder().encode(response) else {
-                return .serverError("encode failed")
-            }
-            return .ok(json: json)
+            var id = ""
+            DispatchQueue.main.sync { id = self.start(url: url) }
+            return .ok(json: Data(("{\"ok\":true,\"id\":\"" + id + "\"}\n").utf8))
         }
 
         router.post(prefix: Self.routePrefix, path: "/cancel") { [weak self] req in
