@@ -89,6 +89,7 @@ final class AppController: NSViewController {
 
         // Create password controller
         passwordController = PasswordController()
+        passwordController.tabsController = tabsController
         _ = passwordController.view // triggers viewDidLoad so /password/* routes register
 
         // Wire history recording onto all current and future tabs

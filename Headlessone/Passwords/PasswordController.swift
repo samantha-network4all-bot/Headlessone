@@ -5,6 +5,7 @@ import CommonCrypto
 
 final class PasswordController: NSViewController {
     let vault = Vault()
+    weak var tabsController: TabsController!
 
     init() {
         super.init(nibName: nil, bundle: nil)
@@ -26,6 +27,7 @@ extension PasswordController: TestAPIControllerRoutes {
     static var routePrefix: String { "password" }
 
     func registerRoutes(on router: TestAPIRouter) {
+        // POST /password/unlock
         router.post(prefix: Self.routePrefix, path: "/unlock") { [weak self] req in
             guard let self else { return .notFound() }
             struct Body: Codable { let master: String }
@@ -38,7 +40,9 @@ extension PasswordController: TestAPIControllerRoutes {
                 vaultURL = fm.temporaryDirectory.appendingPathComponent("headlessone-vault.dat")
             } else {
                 let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-                vaultURL = appSupport.appendingPathComponent("Headlessone/vault.dat")
+                let dir = appSupport.appendingPathComponent("Headlessone", isDirectory: true)
+                try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                vaultURL = dir.appendingPathComponent("vault.dat")
             }
             if fm.fileExists(atPath: vaultURL.path) {
                 if self.vault.unlock(master: b.master) {
@@ -51,12 +55,14 @@ extension PasswordController: TestAPIControllerRoutes {
             }
         }
 
-        router.post(prefix: Self.routePrefix, path: "/lock") { [weak self] req in
+        // POST /password/lock
+        router.post(prefix: Self.routePrefix, path: "/lock") { [weak self] _ in
             guard let self else { return .notFound() }
             self.vault.lock()
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
 
+        // POST /password/save
         router.post(prefix: Self.routePrefix, path: "/save") { [weak self] req in
             guard let self else { return .notFound() }
             struct Body: Codable { let origin: String; let username: String; let password: String }
@@ -70,6 +76,7 @@ extension PasswordController: TestAPIControllerRoutes {
             return .ok(json: Data("{\"ok\":true}\n".utf8))
         }
 
+        // GET /password/list
         router.get(prefix: Self.routePrefix, path: "/list") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
@@ -88,19 +95,20 @@ extension PasswordController: TestAPIControllerRoutes {
             return .ok(json: jsonData)
         }
 
+        // GET /password/get
         router.get(prefix: Self.routePrefix, path: "/get") { [weak self] req in
             guard let self else { return .notFound() }
             guard self.vault.isUnlocked() else {
                 return .unauthorized("vault is locked")
             }
-            guard let origin = req.query["origin"], let username = req.query["username"] else {
-                return .badRequest("required query params: origin, username")
-            }
-            guard let password = self.vault.get(origin: origin, username: username) else {
+            let origin = req.query["origin"]
+            let username = req.query["username"]
+            let password = self.vault.get(origin: origin, username: username)
+            guard let pw = password else {
                 return .notFound()
             }
             struct Response: Codable { let password: String }
-            let resp = Response(password: password)
+            let resp = Response(password: pw)
             guard let data = try? JSONEncoder().encode(resp) else {
                 return .serverError("encoding failed")
             }
@@ -108,5 +116,73 @@ extension PasswordController: TestAPIControllerRoutes {
             json.append(Data("\n".utf8))
             return .ok(json: json)
         }
+
+        // POST /password/delete
+        router.post(prefix: Self.routePrefix, path: "/delete") { [weak self] req in
+            guard let self else { return .notFound() }
+            struct Body: Codable { let origin: String; let username: String }
+            guard let b = try? JSONDecoder().decode(Body.self, from: req.body) else {
+                return .badRequest("body must be {\"origin\": String, \"username\": String}")
+            }
+            guard self.vault.isUnlocked() else {
+                return .unauthorized("vault is locked")
+            }
+            self.vault.delete(origin: b.origin, username: b.username)
+            return .ok(json: Data("{\"ok\":true}\n".utf8))
+        }
+
+        // POST /password/autofill
+        router.post(prefix: Self.routePrefix, path: "/autofill") { [weak self] req in
+            guard let self else { return .notFound() }
+            guard self.vault.isUnlocked() else {
+                return .unauthorized("vault is locked")
+            }
+
+            var filled = false
+            var targetTabId: String?
+
+            // Parse optional tabId from body
+            if !req.body.isEmpty {
+                struct Body: Codable { let tabId: String? }
+                if let b = try? JSONDecoder().decode(Body.self, from: req.body), let id = b.tabId {
+                    targetTabId = id
+                }
+            }
+
+            DispatchQueue.main.sync {
+                var webTab: WebTab?
+                if let tabId = targetTabId {
+                    webTab = self.tabsController.webTab(for: tabId)
+                } else {
+                    webTab = self.tabsController.activeWebTab
+                }
+
+                guard let tab = webTab,
+                      let tabURL = tab.url else { return }
+                let origin = "\(tabURL.scheme ?? "")://\(tabURL.host ?? "")"
+
+                // Find a saved credential matching this origin
+                let items = self.vault.list(origin: origin)
+                guard let first = items.first,
+                      let username = first["username"],
+                      let password = self.vault.get(origin: origin, username: username) else { return }
+
+                let js = Autofill.jsFor(origin: origin, username: username, password: password)
+                let sem = DispatchSemaphore(value: 0)
+                tab.webView.evaluateJavaScript(js) { result, _ in
+                    if let val = result as? Bool {
+                        filled = val
+                    }
+                    sem.signal()
+                }
+                _ = sem.wait(timeout: .now() + 10)
+            }
+
+            let response: [String: Any] = ["ok": true, "filled": filled]
+            let bodyData = (try? JSONSerialization.data(withJSONObject: response)) ?? Data()
+            return .ok(json: bodyData)
+        }
     }
 }
+
+

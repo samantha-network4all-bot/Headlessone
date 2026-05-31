@@ -115,9 +115,29 @@ final class Vault {
         return entries.first { $0.origin == origin && $0.username == username }?.password
     }
 
+    func get(origin: String? = nil, username: String? = nil) -> String? {
+        guard isUnlocked() else { return nil }
+        if let origin = origin, let username = username {
+            return entries.first { $0.origin == origin && $0.username == username }?.password
+        }
+        if let origin = origin {
+            return entries.first { $0.origin == origin }?.password
+        }
+        if let username = username {
+            return entries.first { $0.username == username }?.password
+        }
+        return entries.first?.password
+    }
+
     func delete(origin: String, username: String) {
         guard isUnlocked() else { return }
         entries.removeAll { $0.origin == origin && $0.username == username }
+        persistWithExistingSalt()
+    }
+
+    func clear() {
+        guard isUnlocked() else { return }
+        entries = []
         persistWithExistingSalt()
     }
 
