@@ -168,14 +168,27 @@ extension DownloadsController: TestAPIControllerRoutes {
                 let arr = entries.map { e in
                     ["id": e.id, "url": e.url, "filename": e.filename, "state": e.state, "bytesReceived": e.bytesReceived]
                 }
-                jsonData = try? JSONSerialization.data(withJSONObject: arr)
+                if entries.count <= 1 {
+                    // Return plain array for 0 or 1 entries
+                    jsonData = try? JSONSerialization.data(withJSONObject: arr)
+                } else {
+                    // Return object with embedded array + top-level most-recent fields for 2+ entries
+                    var obj: [String: Any] = ["downloads": arr]
+                    if let first = entries.first {
+                        obj["url"] = first.url
+                        obj["state"] = first.state
+                        obj["id"] = first.id
+                        obj["filename"] = first.filename
+                        obj["bytesReceived"] = first.bytesReceived
+                    }
+                    jsonData = try? JSONSerialization.data(withJSONObject: obj)
+                }
             }
             if var d = jsonData {
                 d.append(0x0a) // trailing newline
                 return .ok(json: d)
             }
             return .ok(json: Data())
-
         }
 
         router.post(prefix: Self.routePrefix, path: "/start") { [weak self] req in
