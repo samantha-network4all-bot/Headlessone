@@ -9,6 +9,7 @@ final class AppController: NSViewController {
     var historyController: HistoryController!
     var bookmarksController: BookmarksController!
     var downloadsController: DownloadsController!
+    var passwordController: PasswordController!
     private var testAPIServer: TestAPIServer?
 
     init() {
@@ -85,6 +86,10 @@ final class AppController: NSViewController {
         downloadsController.tabsController = tabsController
         tabsController.downloadsController = downloadsController
         _ = downloadsController.view // triggers viewDidLoad so /downloads/* routes register
+
+        // Create password controller
+        passwordController = PasswordController()
+        _ = passwordController.view // triggers viewDidLoad so /password/* routes register
 
         // Wire history recording onto all current and future tabs
         let historyCallback: (URL, String) -> Void = { [weak self] url, title in
