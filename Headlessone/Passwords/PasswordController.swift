@@ -78,23 +78,14 @@ extension PasswordController: TestAPIControllerRoutes {
             let origin = req.query["origin"]
             let items = self.vault.list(origin: origin)
             struct Item: Codable { let origin: String; let username: String }
-            let output = items.compactMap { dict -> Item? in
+            let output: [Item] = items.compactMap { dict in
                 guard let o = dict["origin"], let u = dict["username"] else { return nil }
                 return Item(origin: o, username: u)
             }
-            var data = Data("[\n".utf8)
-            for (i, item) in output.enumerated() {
-                if let encoded = try? JSONEncoder().encode(item) {
-                    data.append(encoded)
-                    if i < output.count - 1 {
-                        data.append(Data(",\n".utf8))
-                    } else {
-                        data.append(Data("\n".utf8))
-                    }
-                }
-            }
-            data.append(Data("]\n".utf8))
-            return .ok(json: data)
+            let data = (try? JSONEncoder().encode(output)) ?? Data()
+            var jsonData = data
+            jsonData.append(Data("\n".utf8))
+            return .ok(json: jsonData)
         }
 
         router.get(prefix: Self.routePrefix, path: "/get") { [weak self] req in
@@ -102,17 +93,7 @@ extension PasswordController: TestAPIControllerRoutes {
             guard self.vault.isUnlocked() else {
                 return .unauthorized("vault is locked")
             }
-            let origin = req.query["origin"] ?? {
-                struct Body: Decodable { let origin: String; let username: String }
-                if let b = try? JSONDecoder().decode(Body.self, from: req.body) { return b.origin }
-                return nil
-            }()
-            let username = req.query["username"] ?? {
-                struct Body: Decodable { let origin: String; let username: String }
-                if let b = try? JSONDecoder().decode(Body.self, from: req.body) { return b.username }
-                return nil
-            }()
-            guard let origin, let username else {
+            guard let origin = req.query["origin"], let username = req.query["username"] else {
                 return .badRequest("required query params: origin, username")
             }
             guard let password = self.vault.get(origin: origin, username: username) else {
