@@ -170,7 +170,12 @@ extension DownloadsController: TestAPIControllerRoutes {
                 }
                 jsonData = try? JSONSerialization.data(withJSONObject: arr)
             }
-            return .ok(json: jsonData ?? Data())
+            if var d = jsonData {
+                d.append(0x0a) // trailing newline
+                return .ok(json: d)
+            }
+            return .ok(json: Data())
+
         }
 
         router.post(prefix: Self.routePrefix, path: "/start") { [weak self] req in
