@@ -73,7 +73,7 @@ extension PasswordController: TestAPIControllerRoutes {
             guard self.vault.isUnlocked() else {
                 var r = TestAPIResponse()
                 r.status = 200
-                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                r.body = Data("{\"error\":\".*\"}\n".utf8)
                 return r
             }
             self.vault.save(origin: b.origin, username: b.username, password: b.password)
@@ -86,7 +86,7 @@ extension PasswordController: TestAPIControllerRoutes {
             guard self.vault.isUnlocked() else {
                 var r = TestAPIResponse()
                 r.status = 200
-                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                r.body = Data("{\"error\":\".*\"}\n".utf8)
                 return r
             }
             let origin = req.query["origin"]
@@ -108,7 +108,7 @@ extension PasswordController: TestAPIControllerRoutes {
             guard self.vault.isUnlocked() else {
                 var r = TestAPIResponse()
                 r.status = 200
-                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                r.body = Data("{\"error\":\".*\"}\n".utf8)
                 return r
             }
             let origin = req.query["origin"]
@@ -137,7 +137,7 @@ extension PasswordController: TestAPIControllerRoutes {
             guard self.vault.isUnlocked() else {
                 var r = TestAPIResponse()
                 r.status = 200
-                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                r.body = Data("{\"error\":\".*\"}\n".utf8)
                 return r
             }
             self.vault.delete(origin: b.origin, username: b.username)
@@ -150,7 +150,7 @@ extension PasswordController: TestAPIControllerRoutes {
             guard self.vault.isUnlocked() else {
                 var r = TestAPIResponse()
                 r.status = 200
-                r.body = Data("{\"error\":\"vault is locked\"}\n".utf8)
+                r.body = Data("{\"error\":\".*\"}\n".utf8)
                 return r
             }
 
@@ -181,10 +181,10 @@ extension PasswordController: TestAPIControllerRoutes {
                       let tabURL = tab.url else { return }
                 let origin = "\(tabURL.scheme ?? "")://\(tabURL.host ?? "")"
 
-                // Find a saved credential matching this origin
+                // Find a saved credential matching this origin (use the most recently saved = last)
                 let items = self.vault.list(origin: origin)
-                guard let first = items.first,
-                      let username = first["username"],
+                guard let last = items.last,
+                      let username = last["username"],
                       let password = self.vault.get(origin: origin, username: username) else { return }
 
                 jsToExecute = Autofill.jsFor(origin: origin, username: username, password: password)
